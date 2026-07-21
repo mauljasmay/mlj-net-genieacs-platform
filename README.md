@@ -228,14 +228,25 @@ apt install libssl3                           # Missing SSL lib
 sysctl -w vm.max_map_count=262144            # Kernel parameter
 ```
 
-### Login error: "Unable to open the database file"
-The app auto-creates the `db/` directory on startup. If it still fails:
+### Login error: "Unable to open the database file" (Error code 14)
+Fixed in `src/lib/db.ts` — the database path is now auto-resolved to an absolute path at runtime using `path.resolve(process.cwd(), dbPath)`. This ensures SQLite always finds the database file regardless of how the app is started (PM2, standalone, npm, bun).
+
+If you still encounter this error after updating `db.ts`:
 ```bash
+# Check that the db directory exists at the project root
+ls -la db/
+
+# Manually ensure it exists
 mkdir -p db
+
+# Re-sync the schema
 npx prisma db push
 npx prisma db seed
 pm2 restart mlj-net
 ```
+
+> **Tip**: You can set an absolute path in `.env` to be explicit:
+> `DATABASE_URL="file:/root/mljnet-platform/db/custom.db"`
 
 ### Script syntax error after download
 File transfer may introduce CRLF line endings. Fix:
