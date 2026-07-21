@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  network_security_config.xml - Network Security Configuration
+  
+  Allows the app to connect to:
+  - Any HTTPS host (secure connections)
+  - Any HTTP host (cleartext) - needed for local GenieACS instances
+    that may not have SSL certificates configured
+  
+  This is important because the web app may connect to various
+  GenieACS server instances that could be running on HTTP.
+-->
+<network-security-config>
+    <!-- Allow cleartext (HTTP) traffic for local network connections -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <!-- Trust standard CAs -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Allow all domains (for API calls to various GenieACS instances) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">172.16.0.0</domain>
+    </domain-config>
+</network-security-config>

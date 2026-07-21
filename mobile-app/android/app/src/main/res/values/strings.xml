@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  strings.xml - MLJ NET App Strings
+  
+  Contains user-facing strings for the Android app.
+-->
+<resources>
+    <string name="app_name">MLJ NET</string>
+    <string name="app_name_long">MLJ NET GenieACS</string>
+    <string name="package_name">com.mljnet.genieacs</string>
+    <string name="title_activity_main">MLJ NET</string>
+    <string name="loading_message">Loading MLJ NET…</string>
+    <string name="error_no_internet">No internet connection. Please check your network settings.</string>
+    <string name="error_connection_failed">Failed to connect to server. Please try again.</string>
+    <string name="error_generic">An unexpected error occurred.</string>
+</resources>

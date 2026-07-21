@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  styles.xml - MLJ NET Dark Theme Styles
+  
+  Defines the app's visual theme including:
+  - Dark status bar with light content
+  - Splash screen with dark background
+  - No action bar (full-screen WebView)
+  - Dark navigation bar
+-->
+<resources>
+
+    <!-- Base application theme -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.NoActionBar">
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@color/color_status_bar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/color_navigation_bar</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        
+        <!-- Window background -->
+        <item name="android:windowBackground">@color/color_background</item>
+        <item name="android:colorBackground">@color/color_background</item>
+        
+        <!-- Text appearance -->
+        <item name="android:textColorPrimary">@color/color_text_primary</item>
+        <item name="android:textColorSecondary">@color/color_text_secondary</item>
+        
+        <!-- Remove title bar -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- Splash screen theme -->
+    <style name="AppTheme.NoActionBar.Splash" parent="AppTheme.NoActionBar">
+        <!-- Splash background -->
+        <item name="android:windowBackground">@color/color_splash_background</item>
+        
+        <!-- Full screen -->
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        
+        <!-- Transparent status bar during splash -->
+        <item name="android:statusBarColor">@color/color_splash_background</item>
+        <item name="android:navigationBarColor">@color/color_splash_background</item>
+    </style>
+
+    <!-- Main activity theme (after splash) -->
+    <style name="AppTheme.NoActionBar.Main" parent="AppTheme.NoActionBar">
+        <item name="android:windowBackground">@color/color_background</item>
+    </style>
+
+</resources>

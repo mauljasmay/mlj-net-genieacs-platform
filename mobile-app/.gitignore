@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+www/*
+!www/.gitkeep
+
+# Capacitor generated (managed by cap sync)
+android/app/src/main/java/
+android/app/src/main/assets/
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+
+ios/App/App/Assets.xcassets/
+ios/App/App/Base.lproj/
+ios/App/App/Public/
+ios/App/App/LaunchScreen.storyboard
+ios/App/Pods/
+ios/App/App/build/
+ios/App/build/
+ios/App.xcworkspace/
+ios/App/Podfile.lock
+
+# IDE
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Generated icons (source kept)
+*.ico
+*.icns
+
+# Logs
+*.log
+npm-debug.log*

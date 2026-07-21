@@ -1,0 +1,45 @@
+{
+  "name": "mlj-net-mobile",
+  "version": "1.0.0",
+  "description": "MLJ NET GenieACS - Capacitor mobile app wrapper for Android and iOS",
+  "main": "index.js",
+  "scripts": {
+    "copy-web": "bash copy-web.sh",
+    "build-android": "bash build-android.sh",
+    "build-ios": "bash build-ios.sh",
+    "cap:sync": "npx cap sync",
+    "cap:sync:android": "npx cap sync android",
+    "cap:sync:ios": "npx cap sync ios",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios",
+    "cap:run:android": "npx cap run android",
+    "cap:run:ios": "npx cap run ios",
+    "clean:www": "rm -rf www/*"
+  },
+  "keywords": [
+    "capacitor",
+    "mobile",
+    "android",
+    "ios",
+    "genieacs",
+    "mlj-net",
+    "tr069",
+    "cpe-management"
+  ],
+  "author": "MLJ NET",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/haptics": "^6.0.2",
+    "@capacitor/ios": "^6.2.0",
+    "@capacitor/keyboard": "^6.0.3",
+    "@capacitor/network": "^6.0.3",
+    "@capacitor/splash-screen": "^6.0.3",
+    "@capacitor/status-bar": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

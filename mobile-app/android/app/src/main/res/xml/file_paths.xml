@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  file_paths.xml - FileProvider Paths Configuration
+  
+  Defines the paths that the FileProvider can serve files from.
+  This is used by Capacitor for sharing files (e.g., images,
+  documents) with other apps.
+-->
+<paths>
+    <!-- External storage (photos, downloads, etc.) -->
+    <external-path name="external_files" path="." />
+    
+    <!-- Cache directory -->
+    <cache-path name="cache" path="." />
+    
+    <!-- Internal files directory -->
+    <files-path name="files" path="." />
+    
+    <!-- External cache -->
+    <external-cache-path name="external_cache" path="." />
+    
+    <!-- External media (photos, videos) -->
+    <external-media-path name="media" path="." />
+</paths>

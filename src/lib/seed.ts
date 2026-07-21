@@ -1,0 +1,53 @@
+import { db } from '@/lib/db';
+import { hashPassword } from '@/lib/auth';
+import { ROLE_DEFAULT_PERMISSIONS } from '@/types';
+
+export async function seedDefaultData() {
+  const existingAdmin = await db.user.findFirst({ where: { username: 'admin' } });
+  if (!existingAdmin) {
+    const passwordHash = await hashPassword('admin123');
+    const perms = Object.fromEntries(
+      ROLE_DEFAULT_PERMISSIONS.superadmin.map(p => [p, true])
+    );
+
+    await db.user.create({
+      data: {
+        username: 'admin',
+        passwordHash,
+        displayName: 'Super Admin',
+        role: 'superadmin',
+        permissions: JSON.stringify(perms),
+      },
+    });
+    console.log('Created default admin user (admin / admin123)');
+  }
+
+  // Set default system settings
+  const settings = [
+    { key: 'brand_name', value: 'MLJ NET', type: 'string', category: 'branding' },
+    { key: 'brand_subtitle', value: 'TR-069 / ONT / CPE Management Platform', type: 'string', category: 'branding' },
+    { key: 'genieacs_server_mode', value: 'remote', type: 'string', category: 'genieacs' }, // 'local' or 'remote'
+    { key: 'genieacs_nbi_url', value: process.env.GENIEACS_NBI_URL || 'http://127.0.0.1:7557', type: 'string', category: 'genieacs' },
+    { key: 'genieacs_nbi_username', value: process.env.GENIEACS_NBI_USERNAME || '', type: 'string', category: 'genieacs' },
+    { key: 'genieacs_nbi_password', value: process.env.GENIEACS_NBI_PASSWORD || '', type: 'string', category: 'genieacs' },
+    { key: 'genieacs_remote_host', value: process.env.GENIEACS_REMOTE_HOST || '', type: 'string', category: 'genieacs' },
+    { key: 'genieacs_dashboard_port', value: process.env.GENIEACS_DASHBOARD_PORT || '3000', type: 'string', category: 'genieacs' },
+    { key: 'genieacs_cwmp_port', value: process.env.GENIEACS_CWMP_PORT || '7547', type: 'string', category: 'genieacs' },
+    { key: 'genieacs_nbi_port', value: process.env.GENIEACS_NBI_PORT || '7557', type: 'string', category: 'genieacs' },
+    { key: 'genieacs_fs_port', value: process.env.GENIEACS_FS_PORT || '7567', type: 'string', category: 'genieacs' },
+    { key: 'session_timeout', value: '86400', type: 'number', category: 'security' },
+    { key: 'max_login_attempts', value: '5', type: 'number', category: 'security' },
+  ];
+
+  for (const s of settings) {
+    await db.systemSetting.upsert({
+      where: { key: s.key },
+      update: { value: s.value },
+      create: s,
+    });
+  }
+
+  console.log('System settings initialized');
+}
+
+seedDefaultData().catch(console.error);

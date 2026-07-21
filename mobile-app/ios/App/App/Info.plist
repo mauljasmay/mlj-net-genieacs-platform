@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Info.plist - MLJ NET iOS App Configuration
+  
+  This file configures the iOS application, including:
+  - Display settings (status bar, orientation)
+  - Security (ATS exceptions for local connections)
+  - App metadata (bundle ID, version)
+  - URL schemes (deep linking)
+  
+  NOTE: Capacitor generates much of this automatically when running
+  `npx cap add ios`. This custom version adds MLJ NET-specific
+  configuration. After running `cap sync`, merge any new entries
+  that Capacitor adds into this file.
+-->
+<plist version="1.0">
+<dict>
+    <!-- Bundle Configuration -->
+    <key>CFBundleDisplayName</key>
+    <string>MLJ NET</string>
+    
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    
+    <!-- App Transport Security -->
+    <!-- Allow HTTP connections for local GenieACS instances -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+    
+    <!-- Status Bar Style - Light content on dark background -->
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleLightContent</string>
+    
+    <!-- Hide status bar during launch -->
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    
+    <!-- Supported Interface Orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <!-- Supported Interface Orientations (iPad) -->
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <!-- Require Full Screen (for iPhone) -->
+    <key>UIRequiresFullScreen</key>
+    <false/>
+    
+    <!-- Launch Screen -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+    
+    <!-- URL Scheme for Deep Linking -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.mljnet.genieacs</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>mljnet</string>
+            </array>
+        </dict>
+    </array>
+    
+    <!-- Background Modes (optional - for background sync) -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+    </array>
+    
+    <!-- Privacy Descriptions (add as needed) -->
+    <key>NSCameraUsageDescription</key>
+    <string>Camera access is needed for scanning QR codes and capturing device information.</string>
+    
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Photo library access is needed for importing device images and documentation.</string>
+    
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Location access is used to find nearby network devices.</string>
+    
+    <!-- Minimum iOS Version -->
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
+    
+    <!-- Device Support -->
+    <key>UIDeviceFamily</key>
+    <array>
+        <integer>1</integer>  <!-- iPhone -->
+        <integer>2</integer>  <!-- iPad -->
+    </array>
+    
+    <!-- Status bar is initially hidden -->
+    <key>UIStatusBarHidden</key>
+    <false/>
+    
+    <!-- Application does not use a splash screen storyboard -->
+    <key>UILaunchImages</key>
+    <array/>
+    
+    <!-- Font Usage -->
+    <key>UIAppFonts</key>
+    <array/>
+    
+    <!-- Capacitor Configuration -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024 MLJ NET. All rights reserved.</string>
+</dict>
+</plist>
