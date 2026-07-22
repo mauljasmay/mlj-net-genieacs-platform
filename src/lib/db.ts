@@ -2,7 +2,8 @@ import { PrismaClient } from '@prisma/client'
 import path from 'path'
 import fs from 'fs'
 
-// Ensure the db directory exists and DATABASE_URL uses an absolute path.
+// Ensure the db directory exists, DATABASE_URL uses an absolute path,
+// and the database file is writable.
 function ensureDbDirAndResolveUrl() {
   try {
     let dbUrl = process.env.DATABASE_URL || 'file:./db/custom.db'
@@ -20,6 +21,28 @@ function ensureDbDirAndResolveUrl() {
       const dbDir = path.dirname(dbPath)
       if (!fs.existsSync(dbDir)) {
         fs.mkdirSync(dbDir, { recursive: true })
+      }
+
+      // Fix database file permissions if it exists but is not writable
+      if (fs.existsSync(dbPath)) {
+        try {
+          fs.accessSync(dbPath, fs.constants.W_OK)
+        } catch {
+          fs.chmodSync(dbPath, 0o666)
+          console.log('[db] Fixed read-only database file permissions:', dbPath)
+        }
+      }
+      // Also remove stale WAL/SHM files that may be read-only
+      for (const ext of ['-wal', '-shm']) {
+        const walPath = dbPath + ext
+        if (fs.existsSync(walPath)) {
+          try {
+            fs.unlinkSync(walPath)
+            console.log('[db] Removed stale journal file:', walPath)
+          } catch {
+            // Ignore if we can't remove it
+          }
+        }
       }
     }
   } catch (err) {
