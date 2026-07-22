@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 import { mikrotikCommand } from '@/lib/mikrotik';
+import { getDbReady } from '@/lib/db';
 
 async function requireAuth(request: NextRequest) {
   const token = request.cookies.get('session')?.value;
@@ -19,6 +20,7 @@ function hasPermission(session: any, perm: string): boolean {
 // GET - Fetch Hotspot data (users, active, profiles, servers)
 export async function GET(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'hotspot.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest) {
 // POST - Add/Edit Hotspot entry
 export async function POST(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'hotspot.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -88,6 +91,7 @@ export async function POST(request: NextRequest) {
 // DELETE - Remove Hotspot entry
 export async function DELETE(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'hotspot.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 import { mikrotikCommand } from '@/lib/mikrotik';
+import { getDbReady } from '@/lib/db';
 
 async function requireAuth(request: NextRequest) {
   const token = request.cookies.get('session')?.value;
@@ -19,6 +20,7 @@ function hasPermission(session: any, perm: string): boolean {
 // GET - Fetch PPPoE data (active, secret, or profile)
 export async function GET(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'pppoe.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -45,6 +47,7 @@ export async function GET(request: NextRequest) {
 // POST - Add/Edit PPPoE entry
 export async function POST(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'pppoe.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -85,6 +88,7 @@ export async function POST(request: NextRequest) {
 // DELETE - Remove PPPoE entry
 export async function DELETE(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'pppoe.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

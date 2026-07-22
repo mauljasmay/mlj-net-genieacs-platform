@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { db, getDbReady } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 
 const DEFAULT_USERS = [
@@ -17,6 +17,9 @@ const DEFAULT_USERS = [
 ];
 
 export async function seedDefaultData() {
+  // Ensure database tables are ready before seeding
+  await getDbReady();
+
   // Create default users
   for (const def of DEFAULT_USERS) {
     const existing = await db.user.findFirst({ where: { username: def.username } });

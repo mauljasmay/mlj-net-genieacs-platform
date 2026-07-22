@@ -1,9 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db, getDbReady } from '@/lib/db';
+import { verifySession } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await getDbReady();
+
+    // Auth check
+    const token = request.cookies.get('session')?.value;
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const session = await verifySession(token);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     // Read GenieACS settings from DB
     let nbiUrl = process.env.GENIEACS_NBI_URL || 'http://127.0.0.1:7557';
     let cwmpHost = process.env.GENIEACS_CWMP_HOST || '127.0.0.1';

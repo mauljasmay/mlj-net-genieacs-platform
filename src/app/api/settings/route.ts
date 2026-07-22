@@ -24,9 +24,11 @@ async function requireSettingsAccess(request: NextRequest) {
   return null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await getDbReady();
+    const session = await requireSettingsAccess(request);
+    if (!session) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     const settings = await db.systemSetting.findMany({ orderBy: { category: 'asc' } });
     const grouped: Record<string, any[]> = {};
     for (const s of settings) {
