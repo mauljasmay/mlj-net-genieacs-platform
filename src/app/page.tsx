@@ -1790,8 +1790,8 @@ function SettingsView() {
           )}
         </CardContent>
       </Card>
-      {/* Change Password */
-      {/* Change Password - HIDDEN in remote mode */}
+      {/* Change Password - local mode only */}
+      {settings.genieacs_server_mode !== 'remote' && (
         <Card className="glass-card">
           <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><Key className="w-4 h-4 text-cyan-400" /> Change Password</CardTitle></CardHeader>
           <CardContent className="space-y-3">
