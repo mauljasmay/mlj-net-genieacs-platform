@@ -79,6 +79,14 @@ export async function POST(request: NextRequest) {
     }
 
     await recordSuccessfulLogin(username, ip);
+    // Clean up expired sessions for this user
+    try {
+      await db.session.deleteMany({ where: { userId: user.id, expiresAt: { lt: new Date() } } });
+    } catch { /* ignore */ }
+    // Update lastLoginAt on actual login
+    try {
+      await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), lastLoginIp: ip } });
+    } catch { /* ignore */ }
 
     const token = await createSession(user);
 

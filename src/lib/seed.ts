@@ -63,4 +63,6 @@ export async function seedDefaultData() {
   console.log('System settings initialized');
 }
 
-seedDefaultData().catch(console.error);
+// Export seed function — call from setup.sh or API route, not at import time
+// (auto-execution at module level causes issues during Next.js builds)
+export { seedDefaultData };

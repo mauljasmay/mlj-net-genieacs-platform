@@ -83,8 +83,10 @@ class GenieACSClient {
   async getDeviceCount(query?: string): Promise<number> {
     const q = query || '{}';
     const result = await this.request('/devices/', {
-      query: { limit: '0', skip: '0', query: q },
+      query: { limit: '1', skip: '0', query: q },
     });
+    // NBI returns an array; check for total count in headers or use length
+    if (Array.isArray(result)) return result.length;
     return 0;
   }
 

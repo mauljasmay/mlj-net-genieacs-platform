@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data, tab });
   } catch (error: any) {
     console.error('PPPoE GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch PPPoE data' }, { status: 500 });
+    return NextResponse.json({ error:   'Failed to fetch PPPoE data' }, { status: 500 });
   }
 }
 
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
     console.error('PPPoE POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to execute PPPoE command' }, { status: 500 });
+    return NextResponse.json({ error:   'Failed to execute PPPoE command' }, { status: 500 });
   }
 }
 
@@ -104,6 +104,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('PPPoE DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to delete' }, { status: 500 });
+    return NextResponse.json({ error:   'Failed to delete' }, { status: 500 });
   }
 }

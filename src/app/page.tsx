@@ -483,7 +483,6 @@ function StatCard({ title, value, icon, trend, color }: { title: string; value: 
     red: 'text-red-400 bg-red-500/10 border-red-500/20',
     violet: 'text-violet-400 bg-violet-500/10 border-violet-500/20',
     amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    amber: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
   };
   const colors = colorMap[color] || colorMap.cyan;
 
@@ -1791,9 +1790,8 @@ function SettingsView() {
           )}
         </CardContent>
       </Card>
-
+      {/* Change Password */
       {/* Change Password - HIDDEN in remote mode */}
-      {!isRemote && (
         <Card className="glass-card">
           <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><Key className="w-4 h-4 text-cyan-400" /> Change Password</CardTitle></CardHeader>
           <CardContent className="space-y-3">
@@ -1810,7 +1808,6 @@ function SettingsView() {
           </CardContent>
         </Card>
       )}
-
       <Button onClick={saveSettings} disabled={saving} className="bg-cyan-600 hover:bg-cyan-500">
         {saving ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
         Save Settings

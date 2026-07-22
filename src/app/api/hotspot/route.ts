@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ data, tab });
   } catch (error: any) {
     console.error('Hotspot GET error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch Hotspot data' }, { status: 500 });
+    return NextResponse.json({ error:   'Failed to fetch Hotspot data' }, { status: 500 });
   }
 }
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, result });
   } catch (error: any) {
     console.error('Hotspot POST error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to execute Hotspot command' }, { status: 500 });
+    return NextResponse.json({ error:   'Failed to execute Hotspot command' }, { status: 500 });
   }
 }
 
@@ -108,6 +108,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Hotspot DELETE error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to delete' }, { status: 500 });
+    return NextResponse.json({ error:   'Failed to delete' }, { status: 500 });
   }
 }

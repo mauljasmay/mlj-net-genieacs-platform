@@ -54,12 +54,7 @@ export async function verifySession(token: string) {
     }
     if (!session.user.isActive) return null;
 
-    // Update last login
-    await db.user.update({
-      where: { id: session.user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
+    // Update last login only on explicit login (not on every session verify)
     let parsedPermissions = {};
     try {
       parsedPermissions = JSON.parse((payload.permissions as string) || '{}');

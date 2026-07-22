@@ -67,12 +67,14 @@ export async function mikrotikCommand(cmd: string, params: Record<string, string
 }
 
 export async function testMikrotikConnection(): Promise<{ success: boolean; error?: string; identity?: string }> {
+  let conn: any;
   try {
-    const conn = await getMikrotikConnection();
+    conn = await getMikrotikConnection();
     const identity = await conn.write('/system/identity/print');
     conn.close();
     return { success: true, identity: identity?.[0]?.name || 'Unknown' };
   } catch (error: any) {
+    if (conn) try { conn.close(); } catch {}
     return { success: false, error: error.message || 'Connection failed' };
   }
 }
