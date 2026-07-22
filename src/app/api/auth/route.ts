@@ -1,32 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { verifyPassword, createSession, checkBruteForce, recordFailedLogin, recordSuccessfulLogin, createAuditLog } from '@/lib/auth';
-import { hashPassword } from '@/lib/auth';
+import { db, getDbReady } from '@/lib/db';
+import { verifyPassword, createSession, checkBruteForce, recordFailedLogin, recordSuccessfulLogin, createAuditLog, hashPassword } from '@/lib/auth';
 
-// Auto-seed: ensure admin user exists so the very first login always works.
-async function ensureAdminExists() {
-  try {
-    const existingAdmin = await db.user.findFirst({ where: { username: 'admin' } });
-    if (!existingAdmin) {
-      const passwordHash = await hashPassword('admin123');
-      await db.user.create({
-        data: {
-          username: 'admin',
-          passwordHash,
-          displayName: 'Super Admin',
-          role: 'superadmin',
-          permissions: JSON.stringify({}),
-        },
-      });
-      console.log('[auth] Auto-created default admin user (admin / admin123)');
+// Default users that are auto-created on first access.
+// Add or modify here to change default credentials.
+const DEFAULT_USERS = [
+  {
+    username: 'superadmin',
+    password: '110519',
+    displayName: 'Super Admin',
+    role: 'superadmin',
+  },
+  {
+    username: 'admin',
+    password: 'admin123',
+    displayName: 'Administrator',
+    role: 'superadmin',
+  },
+];
+
+// Ensure default users exist so the very first login always works.
+async function ensureDefaultUsers() {
+  for (const def of DEFAULT_USERS) {
+    try {
+      const existing = await db.user.findFirst({ where: { username: def.username } });
+      if (!existing) {
+        const passwordHash = await hashPassword(def.password);
+        await db.user.create({
+          data: {
+            username: def.username,
+            passwordHash,
+            displayName: def.displayName,
+            role: def.role,
+            permissions: JSON.stringify({}),
+          },
+        });
+        console.log(`[auth] Auto-created user: ${def.username}`);
+      }
+    } catch (err) {
+      console.error(`[auth] Failed to ensure user ${def.username}:`, err);
     }
-  } catch (err) {
-    console.error('[auth] ensureAdminExists error:', err);
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Wait for database tables to be ready (auto-creates if missing)
+    await getDbReady();
+
+    // 2. Ensure at least one default user exists
+    await ensureDefaultUsers();
+
     const body = await request.json();
     const { username, password } = body;
 
@@ -44,7 +68,6 @@ export async function POST(request: NextRequest) {
 
     const user = await db.user.findUnique({ where: { username } });
     if (!user || !user.isActive) {
-      // Record the failed attempt AFTER determining it's actually invalid
       await recordFailedLogin(username, ip);
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
@@ -98,7 +121,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Login error:', error);
-    // Return a more specific message in development for debugging
     const message = process.env.NODE_ENV === 'development'
       ? `Internal server error: ${error.message}`
       : 'Internal server error';
@@ -124,8 +146,8 @@ export async function DELETE(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Ensure admin exists on first GET check (session verify)
-    await ensureAdminExists();
+    await getDbReady();
+    await ensureDefaultUsers();
 
     const token = request.cookies.get('session')?.value;
     if (!token) {

@@ -1,32 +1,45 @@
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
-import { ROLE_DEFAULT_PERMISSIONS } from '@/types';
+
+const DEFAULT_USERS = [
+  {
+    username: 'superadmin',
+    password: '110519',
+    displayName: 'Super Admin',
+    role: 'superadmin',
+  },
+  {
+    username: 'admin',
+    password: 'admin123',
+    displayName: 'Administrator',
+    role: 'superadmin',
+  },
+];
 
 export async function seedDefaultData() {
-  const existingAdmin = await db.user.findFirst({ where: { username: 'admin' } });
-  if (!existingAdmin) {
-    const passwordHash = await hashPassword('admin123');
-    const perms = Object.fromEntries(
-      ROLE_DEFAULT_PERMISSIONS.superadmin.map(p => [p, true])
-    );
-
-    await db.user.create({
-      data: {
-        username: 'admin',
-        passwordHash,
-        displayName: 'Super Admin',
-        role: 'superadmin',
-        permissions: JSON.stringify(perms),
-      },
-    });
-    console.log('Created default admin user (admin / admin123)');
+  // Create default users
+  for (const def of DEFAULT_USERS) {
+    const existing = await db.user.findFirst({ where: { username: def.username } });
+    if (!existing) {
+      const passwordHash = await hashPassword(def.password);
+      await db.user.create({
+        data: {
+          username: def.username,
+          passwordHash,
+          displayName: def.displayName,
+          role: def.role,
+          permissions: JSON.stringify({}),
+        },
+      });
+      console.log(`Created user: ${def.username} / ${def.password}`);
+    }
   }
 
   // Set default system settings
   const settings = [
     { key: 'brand_name', value: 'MLJ NET', type: 'string', category: 'branding' },
     { key: 'brand_subtitle', value: 'TR-069 / ONT / CPE Management Platform', type: 'string', category: 'branding' },
-    { key: 'genieacs_server_mode', value: 'remote', type: 'string', category: 'genieacs' }, // 'local' or 'remote'
+    { key: 'genieacs_server_mode', value: 'remote', type: 'string', category: 'genieacs' },
     { key: 'genieacs_nbi_url', value: process.env.GENIEACS_NBI_URL || 'http://127.0.0.1:7557', type: 'string', category: 'genieacs' },
     { key: 'genieacs_nbi_username', value: process.env.GENIEACS_NBI_USERNAME || '', type: 'string', category: 'genieacs' },
     { key: 'genieacs_nbi_password', value: process.env.GENIEACS_NBI_PASSWORD || '', type: 'string', category: 'genieacs' },

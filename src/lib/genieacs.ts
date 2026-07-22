@@ -286,7 +286,8 @@ export async function getGenieACSSettings(): Promise<{ url: string; username: st
   }
 
   try {
-    const { db } = await import('@/lib/db');
+    const { db, getDbReady } = await import('@/lib/db');
+    await getDbReady();
     const settings = await db.systemSetting.findMany({ where: { category: 'genieacs' } });
     const map: Record<string, string> = {};
     for (const s of settings) map[s.key] = s.value;

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, getDbReady } from '@/lib/db';
 
 export async function GET() {
   try {
+    await getDbReady();
     // Read GenieACS settings from DB
     let nbiUrl = process.env.GENIEACS_NBI_URL || 'http://127.0.0.1:7557';
     let cwmpHost = process.env.GENIEACS_CWMP_HOST || '127.0.0.1';

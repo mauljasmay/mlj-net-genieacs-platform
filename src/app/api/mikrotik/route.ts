@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession, createAuditLog } from '@/lib/auth';
 import { getMikrotikConfig, testMikrotikConnection, invalidateMikrotikCache } from '@/lib/mikrotik';
-import { db } from '@/lib/db';
+import { db, getDbReady } from '@/lib/db';
 
 async function requireAuth(request: NextRequest) {
   const token = request.cookies.get('session')?.value;
@@ -20,6 +20,7 @@ function hasPermission(session: any, perm: string): boolean {
 // GET - Get MikroTik config + test connection
 export async function GET(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'mikrotik.view')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
 // PUT - Save MikroTik config
 export async function PUT(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!hasPermission(session, 'mikrotik.manage')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

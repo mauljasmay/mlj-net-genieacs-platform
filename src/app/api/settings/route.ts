@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, getDbReady } from '@/lib/db';
 import { verifySession, createAuditLog } from '@/lib/auth';
 
 // Category mapping for known setting keys
@@ -26,6 +26,7 @@ async function requireSettingsAccess(request: NextRequest) {
 
 export async function GET() {
   try {
+    await getDbReady();
     const settings = await db.systemSetting.findMany({ orderBy: { category: 'asc' } });
     const grouped: Record<string, any[]> = {};
     for (const s of settings) {
@@ -40,6 +41,7 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireSettingsAccess(request);
     if (!session) return NextResponse.json({ error: 'Forbidden - requires superadmin or admin role' }, { status: 403 });
 

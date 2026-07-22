@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { db, getDbReady } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 
@@ -43,6 +43,7 @@ export async function createSession(user: { id: string; username: string; displa
 
 export async function verifySession(token: string) {
   try {
+    await getDbReady();
     const { payload } = await jwtVerify(token, JWT_SECRET);
     // Check if session exists in DB
     const session = await db.session.findUnique({ where: { token }, include: { user: true } });

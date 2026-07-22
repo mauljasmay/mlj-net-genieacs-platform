@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, getDbReady } from '@/lib/db';
 import { verifySession, hashPassword, verifyPassword, createAuditLog } from '@/lib/auth';
 import { ROLE_DEFAULT_PERMISSIONS, PERMISSIONS } from '@/types';
 
@@ -12,6 +12,7 @@ async function requireAuth(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (session.role !== 'superadmin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -85,6 +87,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -161,6 +164,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await requireAuth(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (session.role !== 'superadmin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

@@ -1,6 +1,6 @@
 // MikroTik RouterOS API client using node-routeros
 import { connect, Socket } from 'routeros';
-import { db } from './db';
+import { db, getDbReady } from './db';
 
 interface MikroTikConfig {
   host: string;
@@ -17,6 +17,7 @@ export async function getMikrotikConfig(): Promise<MikroTikConfig> {
   if (_cachedConfig && Date.now() - _cachedTs < CONFIG_CACHE_TTL) return _cachedConfig;
 
   try {
+    await getDbReady();
     const settings = await db.systemSetting.findMany({ where: { category: 'mikrotik' } });
     const map: Record<string, string> = {};
     for (const s of settings) map[s.key] = s.value;

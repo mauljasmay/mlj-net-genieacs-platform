@@ -167,11 +167,14 @@ Open the URL in your browser (Chrome, Firefox, Safari, etc.)
 ### Step 7: Login
 
 ```
+Username: superadmin
+Password: 110519
+
 Username: admin
 Password: admin123
 ```
 
-> **IMPORTANT:** Change the default password immediately after first login via the User Management menu.
+> **IMPORTANT:** Change the default passwords immediately after first login via the User Management menu.
 
 ### What You Should See
 
