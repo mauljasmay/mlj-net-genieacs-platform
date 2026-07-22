@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('MikroTik GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch MikroTik config' }, { status: 500 });
   }
 }
 
@@ -97,6 +97,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('MikroTik PUT error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to save MikroTik config' }, { status: 500 });
   }
 }

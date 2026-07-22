@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to create user' }, { status: 500 });
+    console.error('Users POST error:', error);
+    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
   }
 }
 
@@ -154,7 +155,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Users PUT error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update user' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
   }
 }
 
@@ -181,6 +182,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Failed to delete user' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
   }
 }

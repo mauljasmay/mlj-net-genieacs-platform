@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { verifyPassword, createSession, checkBruteForce, recordSuccessfulLogin, createAuditLog } from '@/lib/auth';
+import { verifyPassword, createSession, checkBruteForce, recordFailedLogin, recordSuccessfulLogin, createAuditLog } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
+
+// Auto-seed: ensure admin user exists so the very first login always works.
+async function ensureAdminExists() {
+  try {
+    const existingAdmin = await db.user.findFirst({ where: { username: 'admin' } });
+    if (!existingAdmin) {
+      const passwordHash = await hashPassword('admin123');
+      await db.user.create({
+        data: {
+          username: 'admin',
+          passwordHash,
+          displayName: 'Super Admin',
+          role: 'superadmin',
+          permissions: JSON.stringify({}),
+        },
+      });
+      console.log('[auth] Auto-created default admin user (admin / admin123)');
+    }
+  } catch (err) {
+    console.error('[auth] ensureAdminExists error:', err);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
 
-    // Check brute force
+    // Check brute force (only counts, does NOT record a failed attempt here)
     const isBlocked = await checkBruteForce(username, ip);
     if (isBlocked) {
       return NextResponse.json({ success: false, error: 'Too many failed attempts. Try again in 5 minutes.' }, { status: 429 });
@@ -21,11 +44,14 @@ export async function POST(request: NextRequest) {
 
     const user = await db.user.findUnique({ where: { username } });
     if (!user || !user.isActive) {
+      // Record the failed attempt AFTER determining it's actually invalid
+      await recordFailedLogin(username, ip);
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
+      await recordFailedLogin(username, ip);
       return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
     }
 
@@ -42,6 +68,14 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent') || undefined,
     });
 
+    // Safely parse permissions JSON
+    let permissions = {};
+    try {
+      permissions = JSON.parse(user.permissions || '{}');
+    } catch {
+      permissions = {};
+    }
+
     const response = NextResponse.json({
       success: true,
       user: {
@@ -49,7 +83,7 @@ export async function POST(request: NextRequest) {
         username: user.username,
         displayName: user.displayName,
         role: user.role,
-        permissions: JSON.parse(user.permissions || '{}'),
+        permissions,
       },
     });
 
@@ -64,7 +98,11 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error: any) {
     console.error('Login error:', error);
-    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    // Return a more specific message in development for debugging
+    const message = process.env.NODE_ENV === 'development'
+      ? `Internal server error: ${error.message}`
+      : 'Internal server error';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
 
@@ -86,6 +124,9 @@ export async function DELETE(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    // Ensure admin exists on first GET check (session verify)
+    await ensureAdminExists();
+
     const token = request.cookies.get('session')?.value;
     if (!token) {
       return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 });

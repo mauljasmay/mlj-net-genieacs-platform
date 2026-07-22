@@ -59,12 +59,19 @@ export async function verifySession(token: string) {
       data: { lastLoginAt: new Date() },
     });
 
+    let parsedPermissions = {};
+    try {
+      parsedPermissions = JSON.parse((payload.permissions as string) || '{}');
+    } catch {
+      parsedPermissions = {};
+    }
+
     return {
       id: payload.userId as string,
       username: payload.username as string,
       displayName: (payload.displayName as string) || null,
       role: payload.role as string,
-      permissions: JSON.parse((payload.permissions as string) || '{}'),
+      permissions: parsedPermissions,
     };
   } catch {
     return null;
@@ -87,29 +94,49 @@ export async function createAuditLog(data: {
   ipAddress?: string;
   userAgent?: string;
 }) {
-  await db.auditLog.create({ data });
+  try {
+    await db.auditLog.create({ data });
+  } catch (err) {
+    console.error('[auth] Failed to create audit log:', err);
+  }
 }
 
 export async function checkBruteForce(username: string, ipAddress: string): Promise<boolean> {
-  const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
-  const failedAttempts = await db.loginAttempt.count({
-    where: {
-      username,
-      ipAddress,
-      success: false,
-      createdAt: { gte: fiveMinsAgo },
-    },
-  });
+  try {
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const failedAttempts = await db.loginAttempt.count({
+      where: {
+        username,
+        ipAddress,
+        success: false,
+        createdAt: { gte: fiveMinsAgo },
+      },
+    });
 
-  await db.loginAttempt.create({
-    data: { username, ipAddress, success: false },
-  });
+    return failedAttempts >= 5;
+  } catch (err) {
+    // If LoginAttempt table doesn't exist or query fails, allow login through
+    console.error('[auth] checkBruteForce error (allowing login):', err);
+    return false;
+  }
+}
 
-  return failedAttempts >= 5;
+export async function recordFailedLogin(username: string, ipAddress: string) {
+  try {
+    await db.loginAttempt.create({
+      data: { username, ipAddress, success: false },
+    });
+  } catch (err) {
+    console.error('[auth] recordFailedLogin error:', err);
+  }
 }
 
 export async function recordSuccessfulLogin(username: string, ipAddress: string) {
-  await db.loginAttempt.create({
-    data: { username, ipAddress, success: true },
-  });
+  try {
+    await db.loginAttempt.create({
+      data: { username, ipAddress, success: true },
+    });
+  } catch (err) {
+    console.error('[auth] recordSuccessfulLogin error:', err);
+  }
 }

@@ -19,12 +19,26 @@ export async function GET() {
       if (map.genieacs_cwmp_host) cwmpHost = map.genieacs_cwmp_host;
       if (map.genieacs_cwmp_port) cwmpPort = map.genieacs_cwmp_port;
       if (map.genieacs_fs_port) fsPort = map.genieacs_fs_port;
-    } catch {}
+    } catch {
+      // DB not ready yet — fall back to env vars
+    }
+
+    // Safely parse ports with NaN guard
+    function safePort(raw: string, fallback: number): number {
+      const parsed = parseInt(raw, 10);
+      return Number.isNaN(parsed) ? fallback : parsed;
+    }
+
+    // Detect protocol from nbiUrl (support both http and https)
+    const nbiIsHttps = nbiUrl.startsWith('https://');
+    const nbiProto = nbiIsHttps ? 'https' : 'http';
+    const nbiHost = nbiUrl.replace(/^https?:\/\//, '').split(':')[0] || '127.0.0.1';
+    const nbiPort = safePort(nbiUrl.split(':').pop() || '7557', 7557);
 
     const services = [
-      { name: 'NBI API', host: nbiUrl.replace(/^https?:\/\//, '').split(':')[0], port: parseInt(nbiUrl.split(':').pop() || '7557') },
-      { name: 'CWMP / TR-069', host: cwmpHost, port: parseInt(cwmpPort) },
-      { name: 'File Server', host: nbiUrl.replace(/^https?:\/\//, '').split(':')[0], port: parseInt(fsPort) },
+      { name: 'NBI API', host: nbiHost, port: nbiPort, proto: nbiProto },
+      { name: 'CWMP / TR-069', host: cwmpHost, port: safePort(cwmpPort, 7547), proto: 'http' },
+      { name: 'File Server', host: nbiHost, port: safePort(fsPort, 7567), proto: 'http' },
     ];
 
     const results = await Promise.all(
@@ -33,7 +47,7 @@ export async function GET() {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 3000);
-          await fetch(`http://${svc.host}:${svc.port}/`, {
+          await fetch(`${svc.proto}://${svc.host}:${svc.port}/`, {
             signal: controller.signal,
           });
           clearTimeout(timeoutId);
@@ -45,10 +59,11 @@ export async function GET() {
     );
 
     // Dashboard is always online if this API responds
-    results.unshift({ name: 'Dashboard', host: '127.0.0.1', port: 3000, status: 'online' as const, responseTime: 0 });
+    results.unshift({ name: 'Dashboard', host: '127.0.0.1', port: 3000, proto: 'http', status: 'online' as const, responseTime: 0 });
 
     return NextResponse.json({ services: results, serverMode });
-  } catch {
+  } catch (err) {
+    console.error('System GET error:', err);
     return NextResponse.json({ error: 'Failed to check services' }, { status: 500 });
   }
 }
