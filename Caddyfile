@@ -1,4 +1,16 @@
 :81 {
+	@php_path {
+		path /api/php/*
+	}
+
+	# PHP-FPM: proxy PHP API requests to PHP-FPM on port 9000
+	handle @php_path {
+		php_fastcgi unix//run/php/php8.2-fpm.sock {
+			root {env.PROJECT_DIR} /php-api/public
+		}
+	}
+
+	# Transform port proxy (debugging)
 	@transform_port_query {
 		query XTransformPort=*
 	}
@@ -12,6 +24,7 @@
 		}
 	}
 
+	# Default: proxy to Next.js
 	handle {
 		reverse_proxy localhost:3000 {
 			header_up Host {host}

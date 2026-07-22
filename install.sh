@@ -2,6 +2,7 @@
 # ============================================================================
 # MLJ NET GenieACS Platform - Installation Script for Ubuntu 22.04
 # ============================================================================
+# Hybrid Node.js + PHP Architecture
 # Usage: sudo bash install.sh
 # After installation completes, setup.sh runs automatically.
 # ============================================================================
@@ -23,7 +24,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-TOTAL_STEPS=10
+TOTAL_STEPS=11
 CURRENT_STEP=0
 
 log_step() {
@@ -50,7 +51,7 @@ fi
 echo ""
 echo -e "${CYAN}${BOLD}============================================================${NC}"
 echo -e "${CYAN}${BOLD}     MLJ NET GenieACS Platform Installer               ${NC}"
-echo -e "${CYAN}${BOLD}     for Ubuntu 22.04 LTS                            ${NC}"
+echo -e "${CYAN}${BOLD}     Hybrid Node.js + PHP | Ubuntu 22.04 LTS           ${NC}"
 echo -e "${CYAN}${BOLD}============================================================${NC}"
 echo ""
 
@@ -83,29 +84,10 @@ fi
 # ============================================================================
 log_step "Updating system packages"
 
-# Fix broken ondrej/php PPA
-PHP_PPA_FOUND=false
-if compgen -G '/etc/apt/sources.list.d/ondrej*php*.list' &>/dev/null; then
-    PHP_PPA_FOUND=true
-fi
-if compgen -G '/etc/apt/sources.list.d/ondrej*php*.sources' &>/dev/null; then
-    PHP_PPA_FOUND=true
-fi
-if [ "$PHP_PPA_FOUND" = true ]; then
-    log_progress "Removing broken ondrej/php PPA..."
-    for ppalist in /etc/apt/sources.list.d/ondrej*php*; do
-        if [ -f "$ppalist" ]; then
-            rm -f "$ppalist"
-            log_info "Removed $(basename "$ppalist")"
-        fi
-    done
-    for ppakey in /etc/apt/trusted.gpg.d/ondrej*php* /usr/share/keyrings/ondrej*php*; do
-        if [ -f "$ppakey" ]; then
-            rm -f "$ppakey"
-        fi
-    done
-    log_info "Broken PHP PPA cleaned up"
-fi
+# Add ondrej/php PPA for PHP 8.2 (needed for PHP-FPM)
+log_progress "Adding PHP PPA (ondrej/php)..."
+LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php > /dev/null 2>&1 || true
+log_info "PHP PPA added"
 
 log_progress "Updating package lists..."
 apt-get update --allow-releaseinfo-change -qq 2>&1 | grep -v '^W:' || true
@@ -158,7 +140,120 @@ else
 fi
 
 # ============================================================================
-# STEP 4: Install MongoDB 7.0
+# STEP 4: Install PHP 8.2 + FPM + Extensions
+# ============================================================================
+log_step "Installing PHP 8.2 + PHP-FPM"
+
+if command -v php8.2 &>/dev/null; then
+    PHP_VER=$(php8.2 --version | head -1)
+    log_info "PHP already installed: $PHP_VER"
+else
+    log_progress "Installing PHP 8.2 and extensions..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        php8.2 \
+        php8.2-fpm \
+        php8.2-sqlite3 \
+        php8.2-mbstring \
+        php8.2-curl \
+        php8.2-xml \
+        php8.2-zip \
+        php8.2-intl \
+        php8.2-readline \
+        php8.2-opcache \
+        php8.2-redis \
+        php8.2-gd \
+        > /dev/null 2>&1 || true
+    log_info "PHP 8.2 installed"
+fi
+
+if command -v php8.2-fpm &>/dev/null; then
+    PHPFPM_VER=$(php8.2-fpm -v 2>/dev/null | head -1)
+    log_info "PHP-FPM: $PHPFPM_VER"
+else
+    log_warn "PHP-FPM not found, installing..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq php8.2-fpm > /dev/null 2>&1 || true
+    log_info "PHP-FPM installed"
+fi
+
+# Install Composer
+if command -v composer &>/dev/null; then
+    COMPOSER_VER=$(composer --version 2>/dev/null | head -1)
+    log_info "Composer: $COMPOSER_VER"
+else
+    log_progress "Installing Composer..."
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer > /dev/null 2>&1 || true
+    log_info "Composer $(composer --version 2>/dev/null | head -1) installed"
+fi
+
+# Configure PHP-FPM
+log_progress "Configuring PHP-FPM..."
+PHP_FPM_POOL="/etc/php/8.2/fpm/pool.d/mljnet.conf"
+cat > "$PHP_FPM_POOL" << 'PHPEOF'
+[mljnet]
+user = www-data
+group = www-data
+listen = /run/php/php8.2-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+listen.mode = 0666
+pm = dynamic
+pm.max_children = 20
+pm.start_servers = 5
+pm.min_spare_servers = 3
+pm.max_spare_servers = 10
+pm.max_requests = 500
+php_admin_value[error_log] = /var/log/php8.2-fpm-error.log
+php_admin_flag[log_errors] = on
+php_value[session.save_handler] = files
+php_value[session.save_path] = /var/lib/php/sessions
+php_value[max_execution_time] = 120
+php_value[memory_limit] = 256M
+php_value[post_max_size] = 100M
+php_value[upload_max_filesize] = 100M
+php_value[date.timezone] = UTC
+PHPEOF
+log_info "PHP-FPM pool configured"
+
+# Ensure session dir exists
+mkdir -p /var/lib/php/sessions
+chown -R www-data:www-data /var/lib/php/sessions
+chmod 1733 /var/lib/php/sessions
+
+# Configure PHP opcache for production
+PHP_INI="/etc/php/8.2/fpm/php.ini"
+if [ -f "$PHP_INI" ]; then
+    php -r "
+    \$ini = '$PHP_INI';
+    \$content = file_get_contents(\$ini);
+    \$settings = [
+        'opcache.enable=1',
+        'opcache.memory_consumption=128',
+        'opcache.interned_strings_buffer=16',
+        'opcache.max_accelerated_files=10000',
+        'opcache.revalidate_freq=60',
+        'opcache.fast_shutdown=1',
+        'opcache.enable_cli=0',
+    ];
+    foreach (\$settings as \$s) {
+        list(\$k, \$v) = explode('=', \$s, 2);
+        if (strpos(\$content, \$k) !== false) {
+            \$content = preg_replace('/^' . preg_quote(\$k, '/') . '.*$/m', \$k . '=' . \$v, \$content);
+        } else {
+            \$content .= \"\n\" . \$k . '=' . \$v . \"\n\";
+        }
+    }
+    file_put_contents(\$ini, \$content);
+    "
+    log_info "PHP OPcache optimized"
+fi
+
+log_progress "Starting PHP-FPM..."
+systemctl restart php8.2-fpm || true
+systemctl enable php8.2-fpm > /dev/null 2>&1 || true
+log_info "PHP-FPM started and enabled"
+
+# ============================================================================
+# STEP 5: Install MongoDB 7.0
 # ============================================================================
 log_step "Installing MongoDB 7.0"
 
@@ -216,7 +311,7 @@ else
 fi
 
 # ============================================================================
-# STEP 5: Install GenieACS
+# STEP 6: Install GenieACS
 # ============================================================================
 log_step "Installing GenieACS (TR-069 ACS Server)"
 
@@ -308,7 +403,7 @@ systemctl enable genieacs-cwmp genieacs-nbi genieacs-fs > /dev/null 2>&1 || true
 log_info "GenieACS services started"
 
 # ============================================================================
-# STEP 6: Install Caddy Web Server
+# STEP 7: Install Caddy Web Server
 # ============================================================================
 log_step "Installing Caddy (Reverse Proxy)"
 
@@ -328,7 +423,7 @@ else
 fi
 
 # ============================================================================
-# STEP 7: Install PM2 Process Manager
+# STEP 8: Install PM2 Process Manager
 # ============================================================================
 log_step "Installing PM2 Process Manager"
 
@@ -343,7 +438,7 @@ else
 fi
 
 # ============================================================================
-# STEP 8: Configure Firewall
+# STEP 9: Configure Firewall
 # ============================================================================
 log_step "Configuring Firewall (UFW)"
 
@@ -362,7 +457,7 @@ else
 fi
 
 # ============================================================================
-# STEP 9: Optimize System Settings
+# STEP 10: Optimize System Settings
 # ============================================================================
 log_step "Optimizing System Settings"
 
@@ -378,7 +473,6 @@ net.ipv4.ip_local_port_range = 1024 65535
 vm.max_map_count = 262144
 EOF
 
-# Apply one by one - some may fail on restricted VPS kernels
 SYSCTL_OK=true
 while IFS= read -r LINE; do
     [ -z "$LINE" ] && continue
@@ -405,7 +499,7 @@ EOF
 log_info "File descriptor limits set to 65535"
 
 # ============================================================================
-# STEP 10: Verify All Installations
+# STEP 11: Verify All Installations
 # ============================================================================
 log_step "Verifying Installations"
 
@@ -429,6 +523,25 @@ if command -v bun &>/dev/null; then
     log_info "Bun: v$(bun --version)"
 else
     log_warn "Bun: NOT FOUND (will retry in setup)"
+fi
+
+if command -v php8.2 &>/dev/null; then
+    log_info "PHP: $(php8.2 --version | head -1)"
+else
+    log_error "PHP 8.2: NOT FOUND"
+    INSTALL_OK=false
+fi
+
+if systemctl is-active --quiet php8.2-fpm 2>/dev/null; then
+    log_info "PHP-FPM: running (php8.2-fpm)"
+else
+    log_warn "PHP-FPM: not running (will start in setup)"
+fi
+
+if command -v composer &>/dev/null; then
+    log_info "Composer: $(composer --version 2>/dev/null | head -1)"
+else
+    log_warn "Composer: NOT FOUND (will retry in setup)"
 fi
 
 if systemctl is-active --quiet mongod 2>/dev/null; then
@@ -468,13 +581,17 @@ echo -e "${GREEN}${BOLD}  Installation Complete!${NC}"
 echo -e "${CYAN}${BOLD}============================================================${NC}"
 echo ""
 echo -e "  ${BOLD}Installed Components:${NC}"
-echo "    Node.js 20 LTS    - JavaScript runtime"
+echo "    Node.js 20 LTS    - JavaScript runtime (frontend + API)"
 echo "    Bun              - Fast JavaScript runtime and package manager"
+echo "    PHP 8.2 + FPM    - PHP backend API (reports, tools, backup)"
+echo "    Composer         - PHP package manager"
 echo "    MongoDB 7.0      - Database for GenieACS"
 echo "    GenieACS 1.2     - TR-069 ACS (CWMP:7547, NBI:7557, FS:7567)"
-echo "    Caddy 2          - Reverse proxy and auto-HTTPS"
+echo "    Caddy 2          - Reverse proxy (Node.js + PHP-FPM)"
 echo "    PM2              - Process manager"
 echo "    UFW Firewall     - Configured for production"
+echo ""
+echo -e "  ${BOLD}Architecture:${NC} Node.js (Next.js) + PHP 8.2 (FPM) Hybrid"
 echo ""
 echo -e "  ${BOLD}Next Step:${NC} Running setup.sh to configure the platform..."
 echo ""

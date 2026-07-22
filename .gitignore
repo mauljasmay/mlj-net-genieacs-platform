@@ -58,3 +58,6 @@ mobile-app/node_modules/
 # Misc
 *.log
 skills/
+php-api/vendor/
+php-api/config/.env
+backups/

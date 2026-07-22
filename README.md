@@ -1,8 +1,49 @@
 # MLJ NET GenieACS Platform
 
-Unified management panel for TR-069 ACS (GenieACS) — manage ONT/CPE devices, MikroTik routers, PPPoE, and Hotspot from a single dark-themed dashboard.
+Hybrid **Node.js + PHP** management platform for TR-069 ACS (GenieACS) — manage ONT/CPE devices, MikroTik routers, PPPoE, and Hotspot from a single dark-themed dashboard.
 
 **Repository:** [https://github.com/mauljasmay/mlj-net-genieacs-platform](https://github.com/mauljasmay/mlj-net-genieacs-platform)
+
+---
+
+## Architecture Overview
+
+This platform uses a **hybrid Node.js + PHP** architecture, where both runtimes share the same SQLite database and authentication system:
+
+```
+Internet / CPE Devices
+        |
+        v
++----------------------------------------------------------+
+|  Ubuntu 22.04 Server                                      |
+|                                                          |
+|  +--------+    +------------------------------------+    |
+|  | Caddy  |--> |  Frontend + API (:3000)            |    |
+|  | :80/443|    |  Next.js 16 (App Router, TypeScript)|    |
+|  |        |    +------------------------------------+    |
+|  |        |                                              |
+|  |        |    +------------------------------------+    |
+|  |        |--> |  PHP API (/api/php/*)              |    |
+|  |        |    |  PHP 8.2 + FPM (:9000)             |    |
+|  |        |    |  Reports, Backup, Tools, Network   |    |
+|  +--------+    +-------------+----------------------+    |
+|                               |                          |
+|                    +----------+----------+               |
+|                    |                     |               |
+|              +-----v------+       +-----v------+         |
+|              | SQLite     |       | GenieACS   |         |
+|              | (shared)   |       | NBI :7557  |         |
+|              | users,     |       +-----+------+         |
+|              | sessions,  |             |                 |
+|              | settings,  |      +------v------+         |
+|              | audit      |      | MongoDB     |         |
+|              | logs       |      | :27017      |         |
+|              +------------+      +-------------+         |
+|                                                          |
+|  GenieACS CWMP :7547  <--- CPE/ONT Devices               |
+|  GenieACS FS   :7567  (firmware files)                   |
++----------------------------------------------------------+
+```
 
 ---
 
@@ -10,27 +51,34 @@ Unified management panel for TR-069 ACS (GenieACS) — manage ONT/CPE devices, M
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 16 (App Router, TypeScript) |
-| UI | Tailwind CSS v4, shadcn/ui, Glassmorphism dark theme |
-| State | Zustand |
-| Database | SQLite via Prisma ORM (auto-creates tables at runtime) |
-| Auth | JWT (jose) + bcryptjs, brute-force protection |
-| API | Next.js API Routes (proxy to GenieACS NBI) |
-| ACS | GenieACS 1.2 (CWMP:7547, NBI:7557, FS:7567) |
-| Mobile | Capacitor 6 (Android/iOS WebView connector) |
-| Reverse Proxy | Caddy 2 (auto-HTTPS) |
-| Process Manager | PM2 |
+| **Frontend** | Next.js 16 (App Router, TypeScript, React 19) |
+| **Node.js API** | Next.js API Routes (auth, devices, users, settings, system) |
+| **PHP API** | PHP 8.2 + PHP-FPM (reports, backup, tools, network, diagnostics) |
+| **UI** | Tailwind CSS v4, shadcn/ui, Glassmorphism dark theme |
+| **State** | Zustand |
+| **Database** | SQLite via Prisma ORM (Node.js) + PDO/SQLite3 (PHP) — shared |
+| **Auth** | JWT (jose) + bcryptjs (Node.js) / shared session table (PHP) |
+| **ACS** | GenieACS 1.2 (CWMP:7547, NBI:7557, FS:7567) |
+| **MikroTik** | RouterOS API via node-routeros (Node.js) / native PHP socket |
+| **Mobile** | Capacitor 6 (Android/iOS WebView connector) |
+| **Reverse Proxy** | Caddy 2 (auto-HTTPS, routes PHP to PHP-FPM) |
+| **Process Manager** | PM2 (Node.js), systemd (PHP-FPM, GenieACS, MongoDB) |
+
+---
 
 ## Features
 
-- Device management via GenieACS TR-069 / CWMP
+- Device management via GenieACS TR-069 / CWMP (Node.js + PHP)
 - User management with roles: superadmin, admin, operator, technician, viewer
 - System settings with local/remote GenieACS mode
-- MikroTik integration (RouterOS API)
-- PPPoE & Hotspot management
+- MikroTik integration (RouterOS API) — PPPoE, Hotspot, interface traffic, ARP
+- Network tools: ping, traceroute, DNS lookup, port check (PHP)
+- Database backup and restore (PHP)
+- Report generation: device inventory, audit logs, user activity (PHP)
+- System diagnostics: CPU, RAM, disk, network interfaces (PHP)
 - Real-time device status and parameters
 - Session-based authentication with brute-force protection
-- Audit logging
+- Audit logging (shared across Node.js and PHP)
 - PWA support (installable on mobile/desktop)
 - Glassmorphism dark UI with cyan neon highlights
 - Auto-healing: database tables created automatically, admin user auto-seeded on first access
@@ -52,12 +100,15 @@ Unified management panel for TR-069 ACS (GenieACS) — manage ONT/CPE devices, M
 
 | Software | Version | Port | Purpose |
 |----------|---------|------|---------|
-| Node.js | 20 LTS | - | JavaScript runtime |
+| Node.js | 20 LTS | - | JavaScript runtime (frontend + API) |
 | Bun | latest | - | Fast JS runtime & package manager |
+| PHP | 8.2 | - | PHP backend API |
+| PHP-FPM | 8.2 | 9000 (socket) | PHP FastCGI Process Manager |
+| Composer | latest | - | PHP package manager |
 | MongoDB | 7.0 | 27017 (localhost only) | GenieACS core database |
 | GenieACS | 1.2 | 7547, 7557, 7567 | TR-069 ACS server |
-| Caddy | 2 | 80, 443, 3000 | Reverse proxy & auto-HTTPS |
-| PM2 | latest | - | Process manager |
+| Caddy | 2 | 80, 443, 3000 | Reverse proxy (Node.js + PHP-FPM) |
+| PM2 | latest | - | Node.js process manager |
 | UFW | - | - | Firewall (SSH, 80, 443, 3000) |
 
 ---
@@ -68,7 +119,7 @@ Unified management panel for TR-069 ACS (GenieACS) — manage ONT/CPE devices, M
 
 - Fresh or existing **Ubuntu 22.04 LTS** server (physical, VPS, or VM)
 - Root access or sudo privileges
-- Internet connection (for downloading packages from apt, npm, GitHub)
+- Internet connection (for downloading packages)
 - Optional: A domain name pointed to your server IP (for HTTPS via Caddy)
 
 ### Step 1: SSH into Your Server
@@ -97,11 +148,9 @@ python3 generate-scripts.py
 This creates clean `install.sh` and `setup.sh` files. You should see:
 
 ```
-[OK] install.sh generated (491 lines)
-[OK] setup.sh generated (486 lines)
+[OK] install.sh generated (XXX lines)
+[OK] setup.sh generated (XXX lines)
 ```
-
-> **Why is this needed?** Git on Windows/Mac may convert line endings to CRLF, which breaks bash parsing on Linux. The Python script writes files with `newline='\n'` to prevent this.
 
 ### Step 4: Run the Installer
 
@@ -114,55 +163,52 @@ This must be run as root (sudo). The script will:
 1. Display your system info (OS, kernel, CPU, RAM, disk)
 2. Warn if RAM < 2GB or disk < 10GB
 
-The installer runs **10 steps** automatically:
+The installer runs **11 steps** automatically:
 
-| Step | What It Does | Details |
-|------|-------------|--------|
-| 1/10 | Update system packages | Removes broken `ondrej/php` PPA if present, runs `apt-get update --allow-releaseinfo-change`, upgrades packages, installs basic utilities (curl, wget, git, unzip, jq, ufw, etc.) |
-| 2/10 | Install Node.js 20 LTS | Adds NodeSource repository, installs `nodejs` (skips if already installed) |
-| 3/10 | Install Bun runtime | Downloads via `curl -fsSL https://bun.sh/install`, symlinks to `/usr/local/bin/bun` |
-| 4/10 | Install MongoDB 7.0 | Adds MongoDB GPG key + repository, installs `mongodb-org`, creates `/etc/mongod.conf` (bind `127.0.0.1:27017`, no auth), starts + enables service |
-| 5/10 | Install GenieACS 1.2 | `npm install -g genieacs@1.2.x`, creates `genieacs` system user, creates data dirs (`/var/lib/genieacs/`, `/var/log/genieacs/`), creates 3 systemd services |
-| 6/10 | Install Caddy 2 | Adds Caddy repository, installs `caddy` reverse proxy |
-| 7/10 | Install PM2 | `npm install -g pm2`, configures PM2 startup for systemd |
-| 8/10 | Configure UFW firewall | Allows SSH, 80, 443, 3000; enables firewall |
-| 9/10 | Optimize system settings | Creates `/etc/sysctl.d/99-mljnet.conf` (file-max, tcp tuning, vm.max_map_count for MongoDB), sets file descriptor limits to 65535 |
-| 10/10 | Verify installations | Checks all components are installed and running, displays summary |
+| Step | What It Does |
+|------|-------------|
+| 1/11 | Update system packages + add PHP PPA |
+| 2/11 | Install Node.js 20 LTS |
+| 3/11 | Install Bun runtime |
+| 4/11 | Install PHP 8.2 + PHP-FPM + extensions + Composer |
+| 5/11 | Install MongoDB 7.0 + configure + start |
+| 6/11 | Install GenieACS 1.2 + systemd services |
+| 7/11 | Install Caddy 2 (reverse proxy) |
+| 8/11 | Install PM2 process manager |
+| 9/11 | Configure UFW firewall |
+| 10/11 | Optimize system settings (sysctl, limits) |
+| 11/11 | Verify all installations |
 
-After step 10 completes, `install.sh` **automatically chains to `setup.sh`**.
+After step 11 completes, `install.sh` **automatically chains to `setup.sh`**.
 
 ### Step 5: Setup Script Runs Automatically
 
-`setup.sh` runs **9 steps** to configure and start the application:
+`setup.sh` runs **10 steps** to configure and start the application:
 
-| Step | What It Does | Details |
-|------|-------------|--------|
-| 1/9 | Ensure services running | Checks MongoDB (with `fix_mongodb()` auto-fix: removes stale locks, fixes permissions, recreates config, installs `libssl3`, 3 retry attempts) and starts GenieACS CWMP/NBI/FS |
-| 2/9 | Install dependencies | Runs `bun install` (or `npm install` if bun not available) |
-| 3/9 | Configure environment | Creates `.env` with auto-generated `JWT_SECRET` and `SESSION_SECRET` (via `openssl rand -base64 32`), sets `DATABASE_URL`, GenieACS ports, etc. |
-| 4/9 | Initialize database | `npx prisma generate`, `npx prisma db push --force-reset` (creates SQLite tables), `npx prisma db seed` (creates admin user + default settings) |
-| 5/9 | Build Next.js | Runs `bun run build` (or `npm run build`), copies static assets and `public/` into `.next/standalone/`. **Skips if `.next/standalone/server.js` already exists** (incremental friendly) |
-| 6/9 | Configure Caddy | Prompts for domain name. If provided: configures auto-HTTPS. If empty: configures HTTP-only mode on ports 80 and 3000. |
-| 7/9 | Start with PM2 | Creates `ecosystem.config.cjs` (fork mode, 512MB max memory, logs to `./logs/`), starts `mlj-net` process |
-| 8/9 | Systemd service | Creates `/etc/systemd/system/mlj-net.service` for auto-start on boot |
-| 9/9 | Final verification | Checks all 6 services, displays access URLs and default login credentials |
+| Step | What It Does |
+|------|-------------|
+| 1/10 | Ensure services running (MongoDB, GenieACS, PHP-FPM) |
+| 2/10 | Install Node.js dependencies (`bun install` / `npm install`) |
+| 3/10 | Install PHP dependencies (`composer install` in `php-api/`) |
+| 4/10 | Configure `.env` with auto-generated JWT/SESSION secrets |
+| 5/10 | Initialize database (Prisma generate + db push) |
+| 6/10 | Build Next.js production standalone |
+| 7/10 | Configure Caddy (domain/HTTP + PHP-FPM routing) |
+| 8/10 | Start with PM2 |
+| 9/10 | Create systemd service |
+| 10/10 | Final verification (7 service checks) |
 
 ### Step 6: Access the Platform
-
-After setup completes, the script displays your access URL:
 
 **Without domain (HTTP mode):**
 ```
 http://YOUR_SERVER_IP
-http://YOUR_SERVER_IP:3000
 ```
 
 **With domain (HTTPS mode):**
 ```
 https://yourdomain.com
 ```
-
-Open the URL in your browser (Chrome, Firefox, Safari, etc.)
 
 ### Step 7: Login
 
@@ -176,107 +222,49 @@ Password: admin123
 
 > **IMPORTANT:** Change the default passwords immediately after first login via the User Management menu.
 
-### What You Should See
-
-After successful login, you'll see the main dashboard with:
-- Left sidebar with navigation menu (Dashboard, Devices, Users, Settings, etc.)
-- System status panel showing MongoDB, GenieACS CWMP/NBI/FS, and Dashboard status
-- Dark glassmorphism theme with cyan neon highlights
-
 ---
 
-## Updating to Latest Version
+## API Endpoints
 
-When a new version is released on GitHub, update your deployment:
+### Node.js API (port 3000)
 
-```bash
-cd /root/mljnet-platform
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth` | Login |
+| GET | `/api/auth` | Check session |
+| DELETE | `/api/auth` | Logout |
+| GET/POST/PUT/DELETE | `/api/users` | User management |
+| GET/POST/DELETE | `/api/devices` | Device management (GenieACS proxy) |
+| GET/PUT | `/api/settings` | System settings |
+| GET | `/api/system` | Service health check |
+| GET/PUT | `/api/mikrotik` | MikroTik configuration |
+| GET | `/api/pppoe` | PPPoE active sessions |
+| GET | `/api/hotspot` | Hotspot active users |
 
-# Pull latest code
-git pull origin main
+### PHP API (via Caddy → PHP-FPM)
 
-# Regenerate clean scripts (in case they changed)
-python3 generate-scripts.py
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/php/system` | Service health check (PHP) |
+| GET | `/api/php/system/info` | System info (CPU, RAM, disk, network) |
+| GET | `/api/php/reports/devices` | Device inventory report |
+| GET | `/api/php/reports/audit` | Audit log report (filterable) |
+| GET | `/api/php/reports/users` | User activity report |
+| GET | `/api/php/backup` | List database backups |
+| POST | `/api/php/backup` | Create database backup |
+| GET | `/api/php/backup/download` | Download latest backup |
+| POST | `/api/php/backup/restore` | Restore from backup |
+| POST | `/api/php/tools/ping` | Ping a host |
+| POST | `/api/php/tools/traceroute` | Traceroute |
+| POST | `/api/php/tools/dns` | DNS lookup |
+| POST | `/api/php/tools/portcheck` | TCP port check |
+| GET | `/api/php/network/pppoe` | PPPoE active sessions |
+| GET | `/api/php/network/hotspot` | Hotspot active users |
+| GET | `/api/php/network/interfaces` | Interface traffic stats |
+| GET | `/api/php/network/arp` | ARP table |
+| GET/DELETE | `/api/php/devices/*` | Device management (PHP) |
 
-# Install any new dependencies
-bun install
-
-# Regenerate Prisma client (if schema changed)
-npx prisma generate
-
-# Re-sync database schema (safe, only adds new tables/columns)
-npx prisma db push
-
-# Rebuild the Next.js standalone production build
-bun run build
-
-# Restart the application
-pm2 restart mlj-net
-```
-
-> **Note:** If you only changed API/lib code (no schema changes), you can skip the `prisma` commands. If no new dependencies were added, you can skip `bun install`.
-
-### Quick Update (one-liner)
-
-```bash
-cd /root/mljnet-platform && git pull && python3 generate-scripts.py && bun install && npx prisma generate && npx prisma db push && bun run build && pm2 restart mlj-net
-```
-
----
-
-## Architecture Overview
-
-```
-Internet / CPE Devices
-        |
-        v
-+--------------------------------------------------+
-|  Ubuntu 22.04 Server                               |
-|                                                   |
-|  +--------+    +-----------------------------+     |
-|  | Caddy  |--> |  MLJ NET Platform (:3000)   |     |
-|  | :80/443|    |  Next.js Standalone + PM2   |     |
-|  +--------+    +-------------+---------------+     |
-|                               |                     |
-|                    +----------+----------+          |
-|                    |                     |          |
-|              +-----v------+       +-----v------+    |
-|              | SQLite     |       | GenieACS   |    |
-|              | (users,    |       | NBI :7557  |    |
-|              |  sessions, |       +-----+------+    |
-|              |  settings) |             |          |
-|              +------------+      +-----v------+    |
-|                                    | MongoDB   |    |
-|                              +-----v--------+---+ |
-|                              | MongoDB :27017    | |
-|                              +-------------------+ |
-|                                                   |
-|  GenieACS CWMP :7547  <--- CPE/ONT Devices        |
-|  GenieACS FS   :7567  (firmware files)             |
-+--------------------------------------------------+
-```
-
----
-
-## Environment Variables
-
-All variables are defined in `.env` (auto-generated by `setup.sh`, or copy from [`.env.example`](https://github.com/mauljasmay/mlj-net-genieacs-platform/blob/main/.env.example)).
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `file:./db/custom.db` | SQLite database path (relative paths auto-resolved to absolute at runtime) |
-| `GENIEACS_NBI_URL` | `http://127.0.0.1:7557` | GenieACS NBI API URL |
-| `GENIEACS_NBI_USERNAME` | *(empty)* | NBI username (if authentication enabled) |
-| `GENIEACS_NBI_PASSWORD` | *(empty)* | NBI password (if authentication enabled) |
-| `GENIEACS_CWMP_PORT` | `7547` | CWMP/TR-069 port for CPE connections |
-| `GENIEACS_NBI_PORT` | `7557` | NBI API port |
-| `GENIEACS_FS_PORT` | `7567` | File server port |
-| `GENIEACS_DASHBOARD_PORT` | `3000` | Dashboard port |
-| `JWT_SECRET` | *(auto-generated)* | Secret for JWT token signing |
-| `SESSION_SECRET` | *(auto-generated)* | Secret for session encryption |
-| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | Public app URL |
-| `NODE_ENV` | `production` | Node environment |
-| `PORT` | `3000` | App listen port |
+> All PHP API endpoints use the same session cookie as Node.js. Authentication is shared via the SQLite `Session` table.
 
 ---
 
@@ -284,152 +272,216 @@ All variables are defined in `.env` (auto-generated by `setup.sh`, or copy from 
 
 ```
 mlj-net-genieacs-platform/
-  src/
+  src/                            # Node.js source (Next.js)
     app/
-      page.tsx                # Main SPA (all views: login, dashboard, devices, etc.)
-      layout.tsx              # Root layout (metadata, fonts)
-      globals.css             # Global styles + glassmorphism theme
-      api/
-        auth/route.ts         # POST login, GET session, DELETE logout
-        users/route.ts        # GET/POST/PUT/DELETE user management
-        devices/route.ts      # Device list, refresh, tasks (proxies to GenieACS NBI)
-        settings/route.ts     # GET/PUT system settings
-        system/route.ts       # GET service health check
-        mikrotik/route.ts     # GET/PUT MikroTik router config
-        pppoe/route.ts        # GET PPPoE active sessions (via MikroTik)
-        hotspot/route.ts      # GET Hotspot active users (via MikroTik)
-    lib/
-      db.ts                   # Prisma client + auto table creation + path resolver
-      auth.ts                 # JWT, sessions, brute-force, audit logging
-      genieacs.ts             # GenieACS NBI API client with caching
-      seed.ts                 # Default admin + settings seeder
-      device-parser.ts        # Device parameter parser for TR-069 data
-      mikrotik.ts             # RouterOS API wrapper (SSH-based)
-      utils.ts                # Utility functions
-    store/
-      index.ts                # Zustand global state management
-    components/ui/            # shadcn/ui component library (40+ components)
-    hooks/                    # use-mobile, use-toast
-    types/
-      index.ts                # TypeScript type definitions, roles, permissions
+      page.tsx                    # Main SPA (all views)
+      layout.tsx                  # Root layout
+      globals.css                 # Global styles + glassmorphism
+      api/                        # Node.js API routes
+        auth/route.ts
+        users/route.ts
+        devices/route.ts
+        settings/route.ts
+        system/route.ts
+        mikrotik/route.ts
+        pppoe/route.ts
+        hotspot/route.ts
+    lib/                          # Node.js shared libraries
+      db.ts                       # Prisma + auto table creation
+      auth.ts                     # JWT, sessions, brute-force
+      genieacs.ts                 # GenieACS NBI client
+      mikrotik.ts                 # MikroTik RouterOS client
+      seed.ts                     # Default seeder
+      device-parser.ts            # TR-069 parameter parser
+      utils.ts                    # Utility functions
+    store/index.ts                # Zustand state
+    components/ui/                # shadcn/ui (40+ components)
+    types/index.ts                # TypeScript types
+    hooks/                        # use-mobile, use-toast
+  php-api/                        # PHP Backend API
+    public/index.php              # Router/entry point
+    src/
+      lib/                        # PHP shared libraries
+        config.php                # Configuration (.env reader)
+        db.php                    # SQLite3 (shared DB)
+        auth.php                  # Session verification (shared)
+        genieacs.php              # GenieACS NBI HTTP client
+        mikrotik.php              # MikroTik RouterOS socket client
+        helpers.php               # UUID, JSON response, formatting
+      api/                        # PHP API endpoint handlers
+        system.php                # Health check, system info
+        reports.php               # Device/audit/user reports
+        backup.php                # Database backup/restore
+        tools.php                 # Ping, traceroute, DNS, port check
+        network.php               # PPPoE, hotspot, interfaces, ARP
+        devices.php               # GenieACS device management
+    config/.env.example           # PHP env template
+    composer.json                 # PHP dependencies
+    README.md                     # PHP API documentation
   prisma/
-    schema.prisma             # Database schema (SQLite) - 5 models
-  public/                     # Static assets, PWA manifest, icons, favicon
-  mobile-app/                 # Capacitor 6 Android/iOS native wrapper
-  install.sh                  # System dependency installer (10 steps)
-  setup.sh                    # App configuration & build (9 steps)
-  generate-scripts.py         # Regenerates install.sh + setup.sh with clean LF
-  .env.example                # Template environment variables
-  Caddyfile                   # Caddy reverse proxy config template
-  package.json                # Dependencies and scripts
-  next.config.ts              # Next.js config (standalone output)
-  tailwind.config.ts          # Tailwind CSS v4 configuration
-  tsconfig.json               # TypeScript configuration
+    schema.prisma                 # Database schema (5 models)
+  public/                         # Static assets, PWA, icons
+  mobile-app/                     # Capacitor 6 native wrapper
+  install.sh                      # System installer (11 steps, includes PHP)
+  setup.sh                        # App setup (10 steps, includes PHP)
+  fix_all.sh                      # Diagnostic & repair script (includes PHP)
+  generate-scripts.py             # Script LF-line-ending fixer
+  Caddyfile                       # Caddy reverse proxy (Node.js + PHP-FPM)
+  ecosystem.config.cjs            # PM2 config
+  package.json                    # Node.js dependencies
+  README.md                       # This file
 ```
+
+---
+
+## Environment Variables
+
+All variables are defined in `.env` (auto-generated by `setup.sh`).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `file:./db/custom.db` | SQLite database path (shared by Node.js + PHP) |
+| `GENIEACS_NBI_URL` | `http://127.0.0.1:7557` | GenieACS NBI API URL |
+| `GENIEACS_NBI_USERNAME` | *(empty)* | NBI username |
+| `GENIEACS_NBI_PASSWORD` | *(empty)* | NBI password |
+| `GENIEACS_CWMP_PORT` | `7547` | CWMP/TR-069 port |
+| `GENIEACS_NBI_PORT` | `7557` | NBI API port |
+| `GENIEACS_FS_PORT` | `7567` | File server port |
+| `JWT_SECRET` | *(auto-generated)* | Secret for JWT token signing |
+| `SESSION_SECRET` | *(auto-generated)* | Secret for session encryption |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | Public app URL |
+| `NODE_ENV` | `production` | Node environment |
+| `PORT` | `3000` | App listen port |
+| `MIKROTIK_HOST` | `192.168.1.1` | MikroTik router IP |
+| `MIKROTIK_PORT` | `8728` | MikroTik API port |
 
 ---
 
 ## Development (Local)
 
+### Node.js (Frontend + API)
+
 ```bash
-# Clone
-https://github.com/mauljasmay/mlj-net-genieacs-platform.git
+git clone https://github.com/mauljasmay/mlj-net-genieacs-platform.git
 cd mlj-net-genieacs-platform
 
-# Install dependencies
 bun install
-
-# Setup database
-cp .env.example .env        # Edit .env as needed
+cp .env.example .env
 npx prisma generate
 npx prisma db push
-
-# Run development server (hot reload on port 3000)
 bun run dev
 ```
 
-### Development Build
+### PHP API
 
 ```bash
-# Production build
+cd php-api
+composer install
+cp config/.env.example config/.env
+# Edit config/.env as needed
+
+# Run with built-in PHP server (development only)
+php -S localhost:9000 -t public
+
+# Or configure PHP-FPM for production
+```
+
+---
+
+## Updating to Latest Version
+
+```bash
+cd /root/mljnet-platform
+
+# Pull latest code
+git pull origin main
+
+# Regenerate clean scripts
+python3 generate-scripts.py
+
+# Update Node.js dependencies
+bun install
+npx prisma generate
+npx prisma db push
 bun run build
+pm2 restart mlj-net
 
-# Start production server
-bun run start
+# Update PHP dependencies
+cd php-api && composer install --no-interaction && cd ..
 
-# Or use PM2
-pm2 start ecosystem.config.cjs
+# Restart PHP-FPM
+systemctl restart php8.2-fpm
+
+# Restart Caddy (picks up new Caddyfile if changed)
+systemctl restart caddy
+```
+
+### Quick Update (one-liner)
+
+```bash
+cd /root/mljnet-platform && git pull && python3 generate-scripts.py && bun install && npx prisma generate && npx prisma db push && bun run build && cd php-api && composer install --no-interaction && cd .. && pm2 restart mlj-net && systemctl restart php8.2-fpm && systemctl restart caddy
 ```
 
 ---
 
 ## Useful Commands (Production Server)
 
-### Application
+### Application (Node.js)
 
 ```bash
-pm2 logs mlj-net            # View real-time app logs
-pm2 logs mlj-net --lines 50 # Last 50 lines
-pm2 restart mlj-net          # Restart application
-pm2 stop mlj-net             # Stop application
-pm2 start mlj-net            # Start application
-pm2 monit                    # Interactive monitoring dashboard
+pm2 logs mlj-net            # View app logs
+pm2 restart mlj-net          # Restart
+pm2 monit                    # Monitoring dashboard
+```
+
+### PHP-FPM
+
+```bash
+systemctl status php8.2-fpm    # Status
+systemctl restart php8.2-fpm   # Restart
+systemctl reload php8.2-fpm    # Reload config (no downtime)
+tail -f /var/log/php8.2-fpm-error.log  # Error logs
+php8.2 -m                      # List loaded extensions
 ```
 
 ### GenieACS Services
 
 ```bash
-systemctl status genieacs-cwmp       # CWMP service (port 7547)
+systemctl status genieacs-cwmp       # CWMP (port 7547)
 systemctl status genieacs-nbi        # NBI API (port 7557)
 systemctl status genieacs-fs         # File server (port 7567)
-systemctl restart genieacs-cwmp     # Restart CWMP
-systemctl restart genieacs-nbi      # Restart NBI
-journalctl -u genieacs-nbi -f       # Live NBI logs
-journalctl -u genieacs-cwmp -f      # Live CWMP logs
+systemctl restart genieacs-cwmp      # Restart CWMP
+journalctl -u genieacs-nbi -f        # Live NBI logs
 ```
 
 ### MongoDB
 
 ```bash
-systemctl status mongod             # MongoDB status
-systemctl restart mongod             # Restart MongoDB
-journalctl -u mongod -f              # Live MongoDB logs
+systemctl status mongod             # Status
+systemctl restart mongod             # Restart
 mongosh --eval 'db.runCommand({ping:1})'  # Test connection
 ```
 
 ### Caddy (Reverse Proxy)
 
 ```bash
-systemctl status caddy              # Caddy status
-systemctl restart caddy             # Restart Caddy
-cat /etc/caddy/Caddyfile           # View current config
+systemctl status caddy              # Status
+systemctl restart caddy             # Restart
+cat /etc/caddy/Caddyfile           # View config (includes PHP-FPM routing)
+caddy validate --config /etc/caddy/Caddyfile  # Validate
 ```
 
-### SQLite Database
+### Diagnostic & Repair
 
 ```bash
-npx prisma studio                   # Open database browser (port 5555)
-ls -la db/                           # Check database files
-npx prisma db push                   # Re-sync schema
-```
+# Diagnose only (no changes)
+./fix_all.sh
 
-### Firewall (UFW)
+# Diagnose + auto-fix
+./fix_all.sh --fix
 
-```bash
-ufw status                           # Check firewall rules
-ufw allow 7547/tcp                   # Open CWMP port for CPE devices
-ufw status numbered                   # Show rules with line numbers
-```
-
-### Logs
-
-```bash
-pm2 logs mlj-net                    # App logs (PM2)
-tail -f logs/pm2-error.log          # PM2 error log file
-tail -f logs/pm2-out.log             # PM2 output log file
-cat /var/log/genieacs/cwmp.log       # GenieACS CWMP log
-cat /var/log/mongodb/mongod.log     # MongoDB log
-journalctl -u mlj-net -f            # Systemd service log
+# Deep fix (reinstall deps, rebuild)
+./fix_all.sh --fix --deep
 ```
 
 ---
@@ -438,186 +490,123 @@ journalctl -u mlj-net -f            # Systemd service log
 
 | File | Location | Purpose |
 |------|----------|---------|
-| `.env` | Project root | App environment variables (DATABASE_URL, JWT_SECRET, ports) |
-| `ecosystem.config.cjs` | Project root | PM2 process configuration |
-| `/etc/caddy/Caddyfile` | System | Caddy reverse proxy (HTTP/HTTPS) |
-| `/etc/mongod.conf` | System | MongoDB configuration |
-| `/etc/systemd/system/genieacs-*.service` | System | GenieACS systemd services (CWMP, NBI, FS) |
+| `.env` | Project root | App environment (shared by Node.js + PHP) |
+| `php-api/config/.env` | php-api/config/ | PHP-specific overrides |
+| `ecosystem.config.cjs` | Project root | PM2 process config |
+| `/etc/caddy/Caddyfile` | System | Caddy reverse proxy (Node.js + PHP-FPM) |
+| `/etc/php/8.2/fpm/pool.d/mljnet.conf` | System | PHP-FPM pool config |
+| `/etc/mongod.conf` | System | MongoDB config |
+| `/etc/systemd/system/genieacs-*.service` | System | GenieACS services |
 | `/etc/systemd/system/mlj-net.service` | System | MLJ NET auto-start service |
-| `/etc/sysctl.d/99-mljnet.conf` | System | Kernel tuning (file-max, tcp, vm.max_map_count) |
-| `/etc/security/limits.d/99-mljnet.conf` | System | File descriptor limits (65535) |
+| `/etc/sysctl.d/99-mljnet.conf` | System | Kernel tuning |
 
 ---
 
 ## Troubleshooting
 
+### PHP-FPM not working
+
+```bash
+# Check status
+systemctl status php8.2-fpm
+
+# Check socket exists
+ls -la /run/php/php8.2-fpm.sock
+
+# Check error log
+tail -50 /var/log/php8.2-fpm-error.log
+
+# Restart
+systemctl restart php8.2-fpm
+
+# Reinstall if missing
+apt install php8.2-fpm php8.2-sqlite3 php8.2-mbstring php8.2-curl php8.2-xml
+```
+
+### PHP API returns 500 error
+
+```bash
+# Check PHP error log
+tail -50 /var/log/php8.2-fpm-error.log
+
+# Check if vendor directory exists
+ls -la php-api/vendor/
+
+# Reinstall dependencies
+cd php-api && composer install --no-interaction && cd ..
+
+# Check if database is accessible
+php8.2 -r "new SQLite3('../db/custom.db'); echo 'DB OK';"
+```
+
+### Caddy not routing PHP requests
+
+```bash
+# Verify Caddy config has PHP block
+cat /etc/caddy/Caddyfile | grep -A5 php
+
+# If missing, re-run setup or add manually
+# Then reload Caddy
+systemctl reload caddy
+```
+
 ### MongoDB fails to start
 
 ```bash
-# Check error logs
 journalctl -u mongod -n 50 --no-pager
-cat /var/log/mongodb/mongod.log
-
-# Fix 1: Missing SSL library
 apt install libssl3
-
-# Fix 2: Permission issue
 chown -R mongodb:mongodb /var/lib/mongodb /var/log/mongodb
-chmod 755 /var/lib/mongodb /var/log/mongodb
-
-# Fix 3: Stale lock files
 rm -f /var/lib/mongodb/mongod.lock /var/lib/mongodb/WiredTiger.lock
 systemctl restart mongod
-
-# Fix 4: Kernel parameter
 sysctl -w vm.max_map_count=262144
-
-# Fix 5: Out of memory - add swap
-fallocate -l 2G /swapfile
-chmod 600 /swapfile
-mkswap /swapfile
-swapon /swapfile
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
 ### Login error: "Internal server error" (HTTP 500)
 
-The most common cause is missing database tables. The app now has built-in auto-recovery:
-
-1. **Auto table creation** — `db.ts` detects missing tables and creates them via raw SQL automatically
-2. **Auto admin seed** — If the `admin` user doesn't exist, it's created automatically on first session check
-3. **Safe brute-force** — If the `LoginAttempt` table is missing, login proceeds without rate limiting instead of crashing
-
-If you still get errors:
+The app has built-in auto-recovery for missing database tables. If it still fails:
 
 ```bash
-# Manually re-initialize the database
 cd /root/mljnet-platform
 npx prisma generate
 npx prisma db push
-npx prisma db seed
 pm2 restart mlj-net
-
-# Check app logs for the actual error
 pm2 logs mlj-net --lines 30
 ```
 
-### Login error: "Unable to open the database file" (Error code 14)
-
-The database path is auto-resolved to an absolute path at runtime via `path.resolve(process.cwd(), dbPath)` in `src/lib/db.ts`. This handles PM2, standalone, npm, and bun launch methods.
-
-If it still fails:
+### Run Full Diagnostics
 
 ```bash
-# Ensure db directory exists
-mkdir -p db
-
-# Set absolute path in .env
-echo 'DATABASE_URL="file:/root/mljnet-platform/db/custom.db"' >> .env
-pm2 restart mlj-net
-```
-
-### Script syntax error (`syntax error near unexpected token`)
-
-This happens when shell scripts have CRLF line endings from Git/file transfer:
-
-```bash
-# Fix: regenerate clean scripts
-python3 generate-scripts.py
-
-# Alternative: convert existing files
-dos2unix install.sh setup.sh
-```
-
-### GenieACS services not starting
-
-```bash
-# Check individual service
-systemctl status genieacs-cwmp
-journalctl -u genieacs-cwmp -n 30 --no-pager
-
-# Restart all GenieACS services
-systemctl restart genieacs-cwmp genieacs-nbi genieacs-fs
-
-# Check if MongoDB is running (GenieACS depends on it)
-systemctl status mongod
-
-# Recreate GenieACS user and directories
-useradd -r -s /bin/false -d /var/lib/genieacs genieacs 2>/dev/null || true
-mkdir -p /var/lib/genieacs/{cwmp,nbi,fs,public} /var/log/genieacs
-chown -R genieacs:genieacs /var/lib/genieacs /var/log/genieacs
-```
-
-### Caddy not proxying correctly
-
-```bash
-# Check Caddy status
-systemctl status caddy
-
-# View current config
-cat /etc/caddy/Caddyfile
-
-# Validate config
-caddy validate --config /etc/caddy/Caddyfile
-
-# Check if port 3000 is responding
-curl -I http://localhost:3000
-
-# Restart Caddy
-systemctl restart caddy
-```
-
-### PM2 process keeps restarting
-
-```bash
-# Check error logs
-pm2 logs mlj-net --err --lines 50
-
-# Check memory usage
-pm2 monit
-
-# Increase memory limit (edit ecosystem.config.cjs)
-# max_memory_restart: '1G'  (default is 512M)
-
-# Check disk space
-df -h
-
-# Check if port 3000 is already in use
-ss -tlnp | grep 3000
+./fix_all.sh              # Diagnose only
+./fix_all.sh --fix        # Diagnose + auto-fix
+./fix_all.sh --fix --deep # Deep fix
 ```
 
 ---
 
 ## Opening CPE/TR-069 Port for Devices
 
-By default, the firewall only allows SSH, HTTP, HTTPS, and port 3000. To accept TR-069 connections from CPE/ONT devices on port 7547:
-
 ```bash
 ufw allow 7547/tcp
 ufw reload
 ```
 
-Then configure your CPE/ONT devices to connect to:
-```
-http://YOUR_SERVER_IP:7547
-```
+Configure CPE/ONT devices to connect to: `http://YOUR_SERVER_IP:7547`
 
 ---
 
 ## Mobile App
 
-The `mobile-app/` directory contains a Capacitor 6 project that creates a native Android/iOS wrapper app. The app acts as a WebView connector — users enter the server URL and the app loads the platform in a native shell.
-
-See [`mobile-app/README.md`](https://github.com/mauljasmay/mlj-net-genieacs-platform/blob/main/mobile-app/README.md) for build instructions.
+The `mobile-app/` directory contains a Capacitor 6 project for Android/iOS. See [`mobile-app/README.md`](https://github.com/mauljasmay/mlj-net-genieacs-platform/blob/main/mobile-app/README.md) for build instructions.
 
 ---
 
 ## Security Notes
 
-- Default login is `admin` / `admin123` — **change immediately** after first login
+- Default login is `superadmin/110519` and `admin/admin123` — **change immediately**
 - JWT_SECRET and SESSION_SECRET are auto-generated by `setup.sh` with `openssl rand -base64 32`
-- MongoDB is bound to `127.0.0.1` only (not exposed to the network)
-- GenieACS NBI and FS ports are not opened in UFW by default (localhost only)
+- MongoDB is bound to `127.0.0.1` only (not exposed)
+- GenieACS NBI/FS ports are not opened in UFW by default (localhost only)
+- PHP-FPM listens on Unix socket only (not TCP)
 - Brute-force protection: 5 failed login attempts per username/IP per 5 minutes
 - All API error responses use generic messages (no internal error details leaked)
 - Session cookies are `httpOnly` and `sameSite: lax`
