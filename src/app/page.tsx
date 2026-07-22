@@ -118,7 +118,7 @@ function LoginView() {
             </Button>
           </form>
           <p className="text-center text-xs text-muted-foreground/50 mt-6">
-            Default: admin / admin123
+            Default: superadmin / 110519
           </p>
         </CardContent>
       </Card>

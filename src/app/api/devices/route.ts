@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 import { getGenieACSSettings } from '@/lib/genieacs';
+import { getDbReady } from '@/lib/db';
 
 async function getSessionUser(request: NextRequest) {
   const token = request.cookies.get('session')?.value;
@@ -30,6 +31,7 @@ function getAuthHeaders(nbiUser: string, nbiPass: string, extra: Record<string, 
 // Proxy device requests to GenieACS NBI API
 export async function GET(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await getSessionUser(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -100,6 +102,7 @@ export async function GET(request: NextRequest) {
 // Create tasks, tags, etc.
 export async function POST(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await getSessionUser(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -159,6 +162,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    await getDbReady();
     const session = await getSessionUser(request);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 

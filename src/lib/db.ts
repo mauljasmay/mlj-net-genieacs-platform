@@ -90,9 +90,12 @@ CREATE TABLE IF NOT EXISTS "LoginAttempt" (
 `
 
 // Ensure tables exist. Returns a promise that resolves when DB is ready.
-async function ensureTablesExist(prisma: PrismaClient) {
+// This is called lazily via getDbReady() — never at module level — so that
+// the PrismaClient is fully constructed before any raw SQL is executed.
+export async function ensureTablesExist(prisma: PrismaClient) {
   try {
     await prisma.$queryRawUnsafe('SELECT count(*) FROM "User" LIMIT 1')
+    console.log('[db] Tables verified')
   } catch {
     console.log('[db] Tables missing, creating schema via raw SQL...')
     try {
@@ -105,6 +108,7 @@ async function ensureTablesExist(prisma: PrismaClient) {
       console.log('[db] Schema created successfully')
     } catch (sqlErr) {
       console.error('[db] Failed to create schema:', sqlErr)
+      throw sqlErr // Re-throw so caller knows creation failed
     }
   }
 }
@@ -128,7 +132,11 @@ let _dbReadyPromise: Promise<void> | null = null
 
 export function getDbReady(): Promise<void> {
   if (!_dbReadyPromise) {
-    _dbReadyPromise = ensureTablesExist(db)
+    _dbReadyPromise = ensureTablesExist(db).catch(err => {
+      // Reset the promise so the next call retries
+      _dbReadyPromise = null
+      throw err
+    })
   }
   return _dbReadyPromise
 }
