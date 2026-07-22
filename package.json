@@ -1,8 +1,8 @@
 {
   "name": "mlj-net-genieacs-platform",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "MLJ NET - TR-069 / ONT / CPE Management Platform powered by GenieACS",
+  "description": "MLJ NET - Hybrid Node.js + PHP TR-069 / ONT / CPE Management Platform powered by GenieACS",
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
