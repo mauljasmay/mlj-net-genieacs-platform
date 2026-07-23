@@ -40,6 +40,33 @@ import {
 
 const CHART_COLORS = ['#06b6d4', '#22d3ee', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#84cc16'];
 
+// ==================== AUTH-AWARE FETCH HELPER ====================
+// Wraps fetch() to handle 401 (session expired) and other errors gracefully.
+// - 401 → destroys session + redirects to login
+// - Other non-2xx → returns null (caller decides what to show)
+// - Network error → returns null
+async function apiFetch(url: string, options?: RequestInit): Promise<Response | null> {
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      // Session expired or invalid — clear state and redirect to login
+      try { await fetch('/api/auth', { method: 'DELETE' }); } catch {}
+      useAppStore.getState().setUser(null);
+      return null;
+    }
+    return res;
+  } catch {
+    return null; // Network error / timeout
+  }
+}
+
+// Helper: fetch JSON with auth check. Returns parsed JSON or null on any error.
+async function apiFetchJson(url: string, options?: RequestInit): Promise<any | null> {
+  const res = await apiFetch(url, options);
+  if (!res || !res.ok) return null;
+  try { return await res.json(); } catch { return null; }
+}
+
 // ==================== LOGIN VIEW ====================
 function LoginView() {
   const [username, setUsername] = useState('');
@@ -270,9 +297,13 @@ function DashboardView() {
 
   const loadStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/devices?action=list&limit=0&skip=0&projection={"_id":1,"_lastInform":1,"_deviceId":1,"_tags":1}');
-      if (!res.ok) throw new Error('Failed');
-      const devices = await res.json() as any[];
+      const res = await apiFetch('/api/devices?action=list&limit=0&skip=0&projection={"_id":1,"_lastInform":1,"_deviceId":1,"_tags":1}');
+      if (!res) return; // 401 redirected to login, or network error
+      if (!res.ok) {
+        console.error('Dashboard: devices API returned', res.status);
+        return;
+      }
+      const devices = (await res.json() as any[]) || [];
       const now = Date.now();
       const onlineThreshold = 30000;
       const onlineDevices = devices.filter(d => (now - new Date(d._lastInform || 0).getTime()) < onlineThreshold);
@@ -293,19 +324,19 @@ function DashboardView() {
       let hotspotActiveCount = 0;
       try {
         const [pppoeRes, hsRes, hsUsersRes] = await Promise.allSettled([
-          fetch('/api/pppoe?tab=active'),
-          fetch('/api/hotspot?tab=active'),
-          fetch('/api/hotspot?tab=users'),
+          apiFetch('/api/pppoe?tab=active'),
+          apiFetch('/api/hotspot?tab=active'),
+          apiFetch('/api/hotspot?tab=users'),
         ]);
-        if (pppoeRes.status === 'fulfilled' && pppoeRes.value.ok) {
+        if (pppoeRes.status === 'fulfilled' && pppoeRes.value && pppoeRes.value.ok) {
           const pppoeData = await pppoeRes.value.json();
           pppoeActiveCount = Array.isArray(pppoeData.data) ? pppoeData.data.length : 0;
         }
-        if (hsRes.status === 'fulfilled' && hsRes.value.ok) {
+        if (hsRes.status === 'fulfilled' && hsRes.value && hsRes.value.ok) {
           const hsData = await hsRes.value.json();
           hotspotActiveCount = Array.isArray(hsData.data) ? hsData.data.length : 0;
         }
-        if (hsUsersRes.status === 'fulfilled' && hsUsersRes.value.ok) {
+        if (hsUsersRes.status === 'fulfilled' && hsUsersRes.value && hsUsersRes.value.ok) {
           const hsUsersData = await hsUsersRes.value.json();
           hotspotUsersCount = Array.isArray(hsUsersData.data) ? hsUsersData.data.length : 0;
         }
