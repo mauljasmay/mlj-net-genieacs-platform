@@ -45,25 +45,25 @@ const CHART_COLORS = ['#06b6d4', '#22d3ee', '#14b8a6', '#f59e0b', '#ef4444', '#8
 // - 401 → destroys session + redirects to login
 // - Other non-2xx → returns null (caller decides what to show)
 // - Network error → returns null
-async function apiFetch(url: string, options?: RequestInit): Promise<Response | null> {
+async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
   try {
     const res = await fetch(url, options);
     if (res.status === 401) {
       // Session expired or invalid — clear state and redirect to login
       try { await fetch('/api/auth', { method: 'DELETE' }); } catch {}
       useAppStore.getState().setUser(null);
-      return null;
+      return new Response('{"error":"Unauthorized"}', { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } });
     }
     return res;
   } catch {
-    return null; // Network error / timeout
+    return new Response('{"error":"Network error"}', { status: 0, statusText: 'Network Error', headers: { 'Content-Type': 'application/json' } });
   }
 }
 
 // Helper: fetch JSON with auth check. Returns parsed JSON or null on any error.
 async function apiFetchJson(url: string, options?: RequestInit): Promise<any | null> {
   const res = await apiFetch(url, options);
-  if (!res || !res.ok) return null;
+  if (!res.ok) return null;
   try { return await res.json(); } catch { return null; }
 }
 
@@ -298,7 +298,6 @@ function DashboardView() {
   const loadStats = useCallback(async () => {
     try {
       const res = await apiFetch('/api/devices?action=list&limit=0&skip=0&projection={"_id":1,"_lastInform":1,"_deviceId":1,"_tags":1}');
-      if (!res) return; // 401 redirected to login, or network error
       if (!res.ok) {
         console.error('Dashboard: devices API returned', res.status);
         return;
@@ -570,10 +569,10 @@ function DevicesView() {
           ],
         });
       }
-      const res = await fetch(`/api/devices?action=list&limit=${pageSize}&skip=${page * pageSize}&query=${encodeURIComponent(query)}`, {
+      const res = await apiFetch(`/api/devices?action=list&limit=${pageSize}&skip=${page * pageSize}&query=${encodeURIComponent(query)}`, {
         signal: abortRef.current.signal,
       });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) { console.error('Devices API returned', res.status); return; }
       const data = await res.json();
       const parsed = (Array.isArray(data) ? data : []).map(parseDeviceData);
 
@@ -605,7 +604,7 @@ function DevicesView() {
     try {
       const body: Record<string, string> = { action, deviceId };
       if (action === 'task') (body as any).taskName = 'reboot';
-      const res = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await apiFetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (res.ok) {
         toast.success(action === 'task' ? 'Reboot command sent' : 'Action completed');
         loadDevices();
@@ -624,7 +623,7 @@ function DevicesView() {
   const handleSummon = async (deviceId: string) => {
     setActionLoading(deviceId);
     try {
-      const res = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'summon', deviceId }) });
+      const res = await apiFetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'summon', deviceId }) });
       if (res.ok) {
         toast.success('Summon sent to device');
       } else {
@@ -642,7 +641,7 @@ function DevicesView() {
     if (!tagInput.trim() || selectedDevices.size === 0) return;
     try {
       for (const deviceId of selectedDevices) {
-        await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'addTag', deviceId, tagName: tagInput.trim() }) });
+        await apiFetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'addTag', deviceId, tagName: tagInput.trim() }) });
       }
       toast.success(`Tag "${tagInput.trim()}" added to ${selectedDevices.size} device(s)`);
       setShowTagModal(false);
@@ -817,8 +816,8 @@ function DeviceDetailView() {
     if (!selectedDeviceId) return;
     setLoading(true);
     Promise.all([
-      fetch(`/api/devices?action=detail&deviceId=${encodeURIComponent(selectedDeviceId)}`).then(r => r.ok ? r.json() : null),
-      fetch(`/api/devices?action=parameters&deviceId=${encodeURIComponent(selectedDeviceId)}`).then(r => r.ok ? r.json() : []),
+      apiFetch(`/api/devices?action=detail&deviceId=${encodeURIComponent(selectedDeviceId)}`).then(r => r.ok ? r.json() : null),
+      apiFetch(`/api/devices?action=parameters&deviceId=${encodeURIComponent(selectedDeviceId)}`).then(r => r.ok ? r.json() : []),
     ]).then(([dev, params]) => {
       setDevice(dev);
       setParsed(dev ? parseDeviceData(dev) : null);
@@ -837,7 +836,7 @@ function DeviceDetailView() {
     setTaskLoading(true);
     try {
       const body: any = { action: 'task', deviceId: selectedDeviceId, taskName, ...extra };
-      const res = await fetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await apiFetch('/api/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (res.ok) {
         toast.success(`Task "${taskName}" executed successfully`);
       } else {
@@ -845,7 +844,7 @@ function DeviceDetailView() {
         toast.error(`Task failed: ${errData.error || 'Unknown error'}`);
       }
       // Reload device data
-      const dev = await fetch(`/api/devices?action=detail&deviceId=${encodeURIComponent(selectedDeviceId)}`).then(r => r.json());
+      const dev = await apiFetch(`/api/devices?action=detail&deviceId=${encodeURIComponent(selectedDeviceId)}`).then(r => r.json());
       setDevice(dev);
       setParsed(dev ? parseDeviceData(dev) : null);
     } catch (e) {
@@ -1050,7 +1049,7 @@ function TasksView() {
   const loadTasks = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/devices?action=tasks&limit=100');
+      const res = await apiFetch('/api/devices?action=tasks&limit=100');
       if (res.ok) {
         const data = await res.json();
         setTasks(Array.isArray(data) ? data : []);
@@ -1063,7 +1062,7 @@ function TasksView() {
 
   const deleteTask = async (taskId: string) => {
     try {
-      const res = await fetch(`/api/devices?action=task&taskId=${encodeURIComponent(taskId)}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/devices?action=task&taskId=${encodeURIComponent(taskId)}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Task deleted');
         loadTasks();
@@ -1136,7 +1135,7 @@ function FaultsView() {
     setLoading(true);
     try {
       // Bug #1 fix: Single res.json() call - can only consume the response body once
-      const res = await fetch('/api/devices?action=faults&limit=100');
+      const res = await apiFetch('/api/devices?action=faults&limit=100');
       const data = await res.json();
       if (res.ok) setFaults(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
@@ -1147,7 +1146,7 @@ function FaultsView() {
 
   const deleteFault = async (id: string) => {
     try {
-      const res = await fetch(`/api/devices?action=fault&faultId=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/devices?action=fault&faultId=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Fault dismissed');
         loadFaults();
@@ -1212,7 +1211,7 @@ function GenericListView({ title, action, emptyMessage }: { title: string; actio
     setLoading(true);
     try {
       // Bug #1 fix: Single res.json() call - can only consume the response body once
-      const res = await fetch(`/api/devices?action=${action}&limit=1000`);
+      const res = await apiFetch(`/api/devices?action=${action}&limit=1000`);
       const data = await res.json();
       if (res.ok) setItems(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
@@ -1228,7 +1227,7 @@ function GenericListView({ title, action, emptyMessage }: { title: string; actio
     const actionKey = actionMap[action] || action;
     const idParam = idParamMap[action] || `${actionKey}Id`;
     try {
-      const res = await fetch(`/api/devices?action=${actionKey}&${idParam}=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/devices?action=${actionKey}&${idParam}=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success(`${title.slice(0, -1)} deleted`);
         load();
@@ -1407,7 +1406,7 @@ function AdminView() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/users');
+      const res = await apiFetch('/api/users');
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users || []);
@@ -1425,7 +1424,7 @@ function AdminView() {
       return;
     }
     try {
-      const res = await fetch('/api/users', {
+      const res = await apiFetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser),
@@ -1447,7 +1446,7 @@ function AdminView() {
   // Bug #12 fix: deleteUser with confirmation dialog
   const deleteUser = async (id: string) => {
     try {
-      const res = await fetch(`/api/users?id=${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/users?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('User deleted');
         loadUsers();
@@ -1583,7 +1582,7 @@ function SettingsView() {
 
   const loadSettings = async () => {
     try {
-      const res = await fetch('/api/settings');
+      const res = await apiFetch('/api/settings');
       if (res.ok) {
         const data = await res.json();
         const flat: Record<string, string> = {};
@@ -1602,7 +1601,7 @@ function SettingsView() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings }),
@@ -1622,7 +1621,7 @@ function SettingsView() {
     if (newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
     setChangingPassword(true);
     try {
-      const res = await fetch('/api/users', {
+      const res = await apiFetch('/api/users', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: user?.id, oldPassword, password: newPassword }),
@@ -1862,7 +1861,7 @@ function MikroTikView() {
   const loadConfig = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/mikrotik');
+      const res = await apiFetch('/api/mikrotik');
       if (res.ok) {
         const data = await res.json();
         setConfig({ host: data.host || '', port: String(data.port || '8728'), username: data.username || '', password: data.password || '', hasPassword: data.hasPassword });
@@ -1880,7 +1879,7 @@ function MikroTikView() {
       const payload = { ...editConfig };
       // Don't send masked password to API
       if (payload.password === '••••••••') delete payload.password;
-      const res = await fetch('/api/mikrotik', {
+      const res = await apiFetch('/api/mikrotik', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1899,7 +1898,7 @@ function MikroTikView() {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch('/api/mikrotik?action=test');
+      const res = await apiFetch('/api/mikrotik?action=test');
       const data = await res.json();
       setTestResult(data);
       if (data.success) toast.success(`Connected to: ${data.identity}`);
@@ -1991,7 +1990,7 @@ function PPPoEView() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/pppoe?tab=${activeTab}`);
+      const res = await apiFetch(`/api/pppoe?tab=${activeTab}`);
       if (res.ok) {
         const result = await res.json();
         setData(Array.isArray(result.data) ? result.data : []);
@@ -2004,7 +2003,7 @@ function PPPoEView() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/pppoe?tab=${activeTab}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/pppoe?tab=${activeTab}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (res.ok) { toast.success('Deleted'); loadData(); } else toast.error('Failed to delete');
     } catch { toast.error('Connection error'); }
   };
@@ -2030,7 +2029,7 @@ function PPPoEView() {
     try {
       const body: any = { tab: activeTab, action: editItem ? 'edit' : 'add', ...formData };
       if (editItem) body['.id'] = editItem['.id'];
-      const res = await fetch('/api/pppoe', {
+      const res = await apiFetch('/api/pppoe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -2147,7 +2146,7 @@ function HotspotView() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/hotspot?tab=${activeTab}`);
+      const res = await apiFetch(`/api/hotspot?tab=${activeTab}`);
       if (res.ok) {
         const result = await res.json();
         setData(Array.isArray(result.data) ? result.data : []);
@@ -2160,7 +2159,7 @@ function HotspotView() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/hotspot?tab=${activeTab}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/hotspot?tab=${activeTab}&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (res.ok) { toast.success('Deleted'); loadData(); } else toast.error('Failed to delete');
     } catch { toast.error('Connection error'); }
   };
@@ -2186,7 +2185,7 @@ function HotspotView() {
     try {
       const body: any = { tab: activeTab, action: editItem ? 'edit' : 'add', ...formData };
       if (editItem) body['.id'] = editItem['.id'];
-      const res = await fetch('/api/hotspot', {
+      const res = await apiFetch('/api/hotspot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -2336,7 +2335,7 @@ export default function HomePage() {
     if (!isAuthenticated) return;
     const loadStatus = async () => {
       try {
-        const res = await fetch('/api/system');
+        const res = await apiFetch('/api/system');
         if (res.ok) {
           const data = await res.json();
           setServiceStatuses(data.services);
